@@ -1,0 +1,40 @@
+name: Deploy Farmácia Fácil para GitHub Pages
+
+on:
+  push:
+    branches:
+      - main  # Executa automaticamente toda vez que você fizer push no main
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Baixa o código do repositório
+      - name: Checkout código
+        uses: actions/checkout@v4
+
+      # 2. Instala o Flutter
+      - name: Instalar Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.38.5'
+          channel: 'stable'
+
+      # 3. Instala as dependências do projeto
+      - name: Instalar dependências
+        run: flutter pub get
+
+      # 4. Compila o app para Web
+      - name: Compilar para Web
+        run: flutter build web --release --base-href "/farmacia-facil/"
+
+      # 5. Publica na branch gh-pages automaticamente
+      - name: Publicar no GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./build/web
