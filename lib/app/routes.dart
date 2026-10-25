@@ -14,23 +14,24 @@ import '../screens/shared/main_shell.dart';
 
 const _publicRoutes = ['/splash', '/login', '/register'];
 
-GoRouter createRouter(WidgetRef ref) {
-  // ref.watch garante que o router reage a mudanças no authProvider
-  final authState = ref.watch(authProvider);
+GoRouter createRouter(Ref ref) {
+  // Listenable que notifica o GoRouter quando o auth muda
+  final authNotifier = _AuthChangeNotifier(ref);
 
   return GoRouter(
     initialLocation: '/splash',
-    refreshListenable: _AuthNotifier(ref),
+    refreshListenable: authNotifier,
     redirect: (context, state) {
-      final isPublic = _publicRoutes.contains(state.matchedLocation);
+      final authState = ref.read(authProvider);
+      final isPublic  = _publicRoutes.contains(state.matchedLocation);
 
       // Ainda carregando — fica na splash
       if (authState.isLoading) return '/splash';
 
-      // Não logado em rota protegida → login
+      // Não logado em rota protegida → vai para login
       if (!authState.isLoggedIn && !isPublic) return '/login';
 
-      // Logado em rota pública → home
+      // Logado em rota pública → vai para home
       if (authState.isLoggedIn && isPublic) return '/home';
 
       return null;
@@ -77,13 +78,12 @@ GoRouter createRouter(WidgetRef ref) {
   );
 }
 
-// Listenable que notifica o GoRouter quando o authProvider muda
-class _AuthNotifier extends ChangeNotifier {
-  _AuthNotifier(WidgetRef ref) {
+// Notifica o GoRouter quando o estado de autenticação muda
+class _AuthChangeNotifier extends ChangeNotifier {
+  _AuthChangeNotifier(Ref ref) {
     ref.listen(authProvider, (previous, next) {
-      // Notifica o router sempre que o estado de auth mudar
       if (previous?.isLoggedIn != next.isLoggedIn ||
-          previous?.isLoading != next.isLoading) {
+          previous?.isLoading  != next.isLoading) {
         notifyListeners();
       }
     });

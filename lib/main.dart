@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'app/theme.dart';
@@ -19,18 +20,36 @@ void main() async {
   );
 }
 
-class FarmaciaFacilApp extends ConsumerWidget {
+class FarmaciaFacilApp extends ConsumerStatefulWidget {
   const FarmaciaFacilApp({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final router = createRouter(ref);
+  ConsumerState<FarmaciaFacilApp> createState() => _FarmaciaFacilAppState();
+}
 
+class _FarmaciaFacilAppState extends ConsumerState<FarmaciaFacilApp> {
+  // Router criado uma única vez — não recria a cada rebuild
+  late final GoRouter _router;
+
+  @override
+  void initState() {
+    super.initState();
+    _router = createRouter(ref as Ref);
+  }
+
+  @override
+  void dispose() {
+    _router.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return MaterialApp.router(
       title: 'Farmácia Fácil',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
-      routerConfig: router,
+      routerConfig: _router,
     );
   }
 }
