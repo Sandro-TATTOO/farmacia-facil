@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../../providers/medication_provider.dart';
 import '../../models/medication_model.dart';
 import '../../app/theme.dart';
@@ -271,7 +272,7 @@ class _AddMedicationSheetState extends State<_AddMedicationSheet> {
 
     final medication = MedicationModel(
       id: 'med_${DateTime.now().millisecondsSinceEpoch}',
-      userId: 'current_user',
+      userId: FirebaseAuth.instance.currentUser?.uid ?? '',
       name: _nameController.text.trim(),
       dosage: _dosageController.text.trim(),
       instructions: _instructionsController.text.trim(),

@@ -1,0 +1,316 @@
+================================================================
+  FARMÁCIA FÁCIL — ANÁLISE TÉCNICA COMPLETA DO PROJETO
+  Data: Outubro 2026
+================================================================
+
+----------------------------------------------------------------
+1. VISÃO GERAL
+----------------------------------------------------------------
+
+Nome              : Farmácia Fácil
+Versão            : 1.0.0+1
+Flutter           : 3.38.5 | Dart 3.10.4
+Estado            : Em desenvolvimento — Fase 1 concluída
+Link online       : https://sandro-tattoo.github.io/farmacia-facil/
+Repositório       : https://github.com/Sandro-TATTOO/farmacia-facil
+Total de arquivos : 16 arquivos Dart em lib/
+
+Tecnologias usadas:
+  - Riverpod 3.3.2     → gerenciamento de estado
+  - GoRouter 17.5.0    → navegação entre telas
+  - SharedPreferences  → armazenamento local (temporário)
+  - Firebase           → declarado, integração em andamento
+
+
+----------------------------------------------------------------
+2. ARQUIVOS DO PROJETO — O QUE CADA UM FAZ
+----------------------------------------------------------------
+
+lib/main.dart
+  Ponto de entrada do app. Inicializa o Firebase e o Riverpod.
+  STATUS: OK — funcionando
+
+lib/app/theme.dart
+  Define as cores (verde e branco) e o estilo visual do app.
+  STATUS: OK
+
+lib/app/routes.dart
+  Define todas as telas e a navegação entre elas.
+  STATUS: ATENÇÃO — não tem proteção de rota por login
+
+lib/firebase_options.dart
+  Configurações de conexão com o Firebase (gerado automaticamente).
+  STATUS: OK — gerado pelo FlutterFire CLI
+
+lib/models/user_model.dart
+  Estrutura de dados do usuário (nome, e-mail, telefone, endereço).
+  STATUS: OK
+
+lib/models/medication_model.dart
+  Estrutura de dados dos remédios (nome, dose, horários, estoque).
+  STATUS: OK
+
+lib/models/pharmacy_model.dart
+  Estrutura de dados das farmácias (nome, endereço, distância).
+  STATUS: OK
+
+lib/models/health_tip_model.dart
+  Estrutura de dados das dicas de saúde.
+  STATUS: ATENÇÃO — modelo criado mas não usado na tela de dicas
+
+lib/providers/auth_provider.dart
+  Lógica de cadastro, login, sessão e logout.
+  STATUS: ATENÇÃO — senha salva sem criptografia (temporário)
+
+lib/providers/medication_provider.dart
+  Lógica de salvar, remover e atualizar remédios.
+  STATUS: ATENÇÃO — remédios não vinculados ao usuário logado
+
+lib/screens/auth/splash_screen.dart
+  Tela inicial com logo animado. Redireciona para login ou home.
+  STATUS: OK — bem implementada
+
+lib/screens/auth/login_screen.dart
+  Tela de login com e-mail e senha.
+  STATUS: OK — funcionando
+
+lib/screens/auth/register_screen.dart
+  Tela de cadastro com todos os campos.
+  STATUS: OK — funcionando
+
+lib/screens/shared/main_shell.dart
+  Barra de navegação inferior com 5 abas.
+  STATUS: OK — pequeno aviso de código deprecated
+
+lib/screens/user/home_screen.dart
+  Tela principal com resumo, alertas e ações rápidas.
+  STATUS: ATENÇÃO — alguns números estão fixos (não dinâmicos)
+
+lib/screens/user/medications_screen.dart
+  Tela de gerenciamento de remédios.
+  STATUS: ATENÇÃO — userId do remédio está fixo como 'current_user'
+
+lib/screens/user/pharmacies_screen.dart
+  Tela de farmácias próximas.
+  STATUS: ATENÇÃO — dados e botões são exemplos, sem lógica real
+
+lib/screens/user/health_tips_screen.dart
+  Tela de dicas de saúde por categoria.
+  STATUS: ATENÇÃO — usa Map em vez do HealthTipModel
+
+lib/screens/user/profile_screen.dart
+  Tela de perfil e configurações.
+  STATUS: ATENÇÃO — botões de configuração sem ação
+
+
+----------------------------------------------------------------
+3. PROBLEMAS ENCONTRADOS
+----------------------------------------------------------------
+
+🔴 CRÍTICOS — Precisam ser resolvidos logo
+─────────────────────────────────────────────────────────────
+
+PROBLEMA 1: Senha salva sem criptografia
+  Arquivo  : lib/providers/auth_provider.dart
+  O que é  : A senha do usuário está salva em texto puro
+             no armazenamento local do dispositivo.
+  Risco    : Se alguém acessar o armazenamento interno do
+             aparelho, consegue ver a senha.
+  Solução  : Migrar para Firebase Authentication — o Firebase
+             cuida da segurança das senhas automaticamente.
+
+PROBLEMA 2: Qualquer pessoa pode acessar telas sem login
+  Arquivo  : lib/app/routes.dart
+  O que é  : Não há verificação se o usuário está logado
+             antes de mostrar as telas do app.
+  Risco    : Uma pessoa pode digitar o link direto e entrar
+             sem passar pelo login.
+  Solução  : Adicionar um redirecionamento automático para
+             a tela de login se não estiver autenticado.
+
+PROBLEMA 3: Remédios não separados por usuário
+  Arquivo  : lib/providers/medication_provider.dart
+  O que é  : Os remédios são salvos numa lista geral,
+             sem identificar a qual usuário pertencem.
+  Risco    : Se dois usuários usarem o mesmo dispositivo,
+             um vê os remédios do outro.
+  Solução  : Vincular cada remédio ao ID do usuário logado
+             e separar os dados por usuário.
+
+PROBLEMA 4: Chaves do Firebase no repositório público
+  Arquivo  : lib/firebase_options.dart
+  O que é  : As chaves de conexão com o Firebase estão
+             visíveis no código no GitHub.
+  Risco    : Baixo por enquanto (Firebase tem regras de
+             segurança), mas não é uma boa prática.
+  Solução  : Configurar regras de segurança no Firebase
+             Console para limitar o acesso.
+
+─────────────────────────────────────────────────────────────
+🟠 IMPORTANTES — Devem ser resolvidos em breve
+─────────────────────────────────────────────────────────────
+
+PROBLEMA 5: Firebase instalado mas não usado
+  Arquivo  : lib/main.dart e pubspec.yaml
+  O que é  : O Firebase é inicializado mas toda a lógica
+             de autenticação ainda usa SharedPreferences.
+  Solução  : Próximo passo é migrar auth_provider.dart
+             para usar Firebase Authentication de verdade.
+
+PROBLEMA 6: userId 'current_user' fixo
+  Arquivo  : lib/screens/user/medications_screen.dart
+  O que é  : O ID do usuário ao salvar remédios está
+             com o valor fixo 'current_user' no código.
+  Solução  : Ler o ID real do authProvider.
+
+PROBLEMA 7: HealthTipModel não é usado
+  Arquivo  : lib/screens/user/health_tips_screen.dart
+  O que é  : O modelo de dicas de saúde foi criado mas a
+             tela usa um formato diferente (Map).
+  Solução  : Refatorar a tela para usar o HealthTipModel.
+
+PROBLEMA 8: Dependências instaladas sem uso
+  Arquivo  : pubspec.yaml
+  Pacotes  : riverpod_annotation, google_fonts,
+             flutter_local_notifications, intl,
+             firebase_auth, cloud_firestore
+  O que é  : Estão declarados no projeto mas nenhum
+             desses pacotes é usado no código atual.
+  Impacto  : Aumenta o tamanho do app e o tempo de build.
+  Solução  : Remover os não usados; usar firebase_auth e
+             cloud_firestore quando migrar para Firebase.
+
+─────────────────────────────────────────────────────────────
+🟡 MENORES — Melhorias de qualidade
+─────────────────────────────────────────────────────────────
+
+PROBLEMA 9: Números fixos na Home
+  Tela Home mostra sempre "12 farmácias" e "8 dicas"
+  independentemente dos dados reais.
+
+PROBLEMA 10: Busca e filtros de farmácias sem lógica
+  A barra de busca e os filtros de farmácias são visuais
+  mas não filtram a lista de verdade.
+
+PROBLEMA 11: Botões sem ação no Perfil e Farmácias
+  "Notificações", "Editar perfil", "Alterar senha",
+  "Ligar" para farmácia — todos abrem mas não fazem nada.
+
+PROBLEMA 12: CI/CD sem testes automáticos
+  O deploy automático não roda testes antes de publicar.
+  Código quebrado pode ir para o ar sem avisar.
+
+PROBLEMA 13: Assets não declarados no pubspec.yaml
+  As pastas assets/images/ e assets/icons/ existem mas não
+  estão configuradas no pubspec.yaml, então imagens
+  adicionadas lá não aparecem no app.
+
+
+----------------------------------------------------------------
+4. FUNCIONALIDADES — STATUS ATUAL
+----------------------------------------------------------------
+
+  [OK] Splash screen com animação
+  [OK] Cadastro de usuário com validação
+  [OK] Login com e-mail e senha
+  [OK] Sessão salva (usuário continua logado)
+  [OK] Logout
+  [OK] Tela Home com resumo e ações
+  [OK] Adicionar remédio com horários e duração
+  [OK] Registrar dose tomada
+  [OK] Alerta visual de estoque baixo
+  [OK] Remover remédio
+  [OK] Lista de farmácias (dados de exemplo)
+  [OK] Dicas de saúde com categorias
+  [OK] Perfil com dados do usuário
+  [OK] App publicado online (GitHub Pages)
+  [OK] Deploy automático (GitHub Actions)
+  [OK] Firebase inicializado no projeto
+
+  [PARCIAL] Firebase Auth — instalado, não integrado ainda
+  [PARCIAL] Cloud Firestore — instalado, não integrado ainda
+
+  [PENDENTE] Proteção de rotas por autenticação
+  [PENDENTE] Busca real de farmácias por localização
+  [PENDENTE] Notificações de horário dos remédios
+  [PENDENTE] Pedidos dentro do app (Fase 2)
+  [PENDENTE] OCR de receitas (Fase 3)
+  [PENDENTE] Painel da farmácia
+  [PENDENTE] Painel do entregador
+
+
+----------------------------------------------------------------
+5. PRÓXIMOS PASSOS RECOMENDADOS (em ordem de prioridade)
+----------------------------------------------------------------
+
+1. MIGRAR AUTENTICAÇÃO PARA FIREBASE AUTH
+   - Substituir SharedPreferences por Firebase Authentication
+   - Resolver o problema de senha em texto puro
+   - Login e cadastro passarão a funcionar na nuvem
+   - Usuário acessa a conta em qualquer dispositivo
+
+2. MIGRAR DADOS PARA CLOUD FIRESTORE
+   - Remédios salvos na nuvem, vinculados ao usuário
+   - Dados acessíveis em qualquer dispositivo
+   - Preparação para Fase 2 (pedidos)
+
+3. PROTEGER AS ROTAS
+   - Adicionar verificação de login no GoRouter
+   - Usuário não logado vai automaticamente para login
+
+4. CORRIGIR userId DOS REMÉDIOS
+   - Usar o ID real do usuário logado
+   - Separar dados por usuário
+
+5. IMPLEMENTAR NOTIFICAÇÕES
+   - Usar flutter_local_notifications (já instalado)
+   - Avisar no horário de tomar cada remédio
+
+6. IMPLEMENTAR BUSCA DE FARMÁCIAS
+   - Integrar Google Maps ou similar
+   - Buscar farmácias reais pela localização do usuário
+
+7. MELHORIAS VISUAIS
+   - Ícone personalizado do app
+   - Logo real na splash screen
+   - Tela de edição de perfil funcionando
+
+
+----------------------------------------------------------------
+6. PONTOS POSITIVOS DO PROJETO
+----------------------------------------------------------------
+
+  ✓ Arquitetura bem organizada para o nível do projeto
+  ✓ Splash screen com sincronização correta de animação e auth
+  ✓ Estado imutável com copyWith bem implementado
+  ✓ Modelos de dados bem definidos
+  ✓ Aviso médico consistente em todas as telas de saúde
+  ✓ Deploy automático funcionando via GitHub Actions
+  ✓ App publicado e acessível publicamente na internet
+  ✓ Firebase já integrado e pronto para uso
+  ✓ Código organizado e legível
+
+
+----------------------------------------------------------------
+7. RESUMO EXECUTIVO
+----------------------------------------------------------------
+
+O projeto está em bom estado para uma Fase 1. A base está
+construída corretamente: todas as telas existem, a navegação
+funciona, o login e cadastro operam, e o app está publicado
+online com deploy automático.
+
+O principal trabalho agora é a MIGRAÇÃO PARA FIREBASE — que
+vai resolver de uma vez os problemas de segurança (senhas),
+de acesso multi-dispositivo e de isolamento de dados entre
+usuários. O Firebase já está instalado e inicializado no
+projeto, faltando apenas integrar a lógica de auth e banco.
+
+Estimativa de esforço para migração Firebase:
+  - Firebase Authentication : 1 sessão de trabalho
+  - Cloud Firestore         : 2 sessões de trabalho
+  - Proteção de rotas       : 1 sessão de trabalho
+
+================================================================
+  FIM DA ANÁLISE TÉCNICA
+================================================================

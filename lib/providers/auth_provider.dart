@@ -1,12 +1,8 @@
-import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/user_model.dart';
-
-// ─── Chaves de armazenamento local ───────────────────────────────────────────
-const _kLoggedUserId = 'ff_loggedUserId';
-const _kUsersMap     = 'ff_usersMap';
 
 // ─── Estado ──────────────────────────────────────────────────────────────────
 class AuthState {
@@ -39,34 +35,55 @@ class AuthState {
 
 // ─── Notifier ────────────────────────────────────────────────────────────────
 class AuthNotifier extends Notifier<AuthState> {
+  // Instâncias do Firebase
+  final _auth      = FirebaseAuth.instance;
+  final _firestore = FirebaseFirestore.instance;
+
   @override
   AuthState build() {
-    Future.microtask(_loadSavedSession);
+    // Escuta mudanças de autenticação em tempo real
+    _auth.authStateChanges().listen(_onAuthStateChanged);
     return const AuthState(isLoading: true);
   }
 
-  // ── Carrega sessão ao abrir o app ─────────────────────────────────────────
-  Future<void> _loadSavedSession() async {
-    try {
-      final prefs  = await _getPrefs();
-      final userId = prefs.getString(_kLoggedUserId);
-
-      _log('Sessão salva: $userId');
-      _log('UsersMap: ${prefs.getString(_kUsersMap)}');
-
-      if (userId != null && userId.isNotEmpty) {
-        final user = _getUserById(prefs, userId);
-        if (user != null) {
-          _log('Usuário encontrado: ${user.email}');
-          state = AuthState(user: user);
-          return;
-        }
-      }
-    } catch (e) {
-      _log('Erro ao carregar sessão: $e');
+  // Chamado automaticamente quando o usuário loga ou desloga
+  Future<void> _onAuthStateChanged(User? firebaseUser) async {
+    if (firebaseUser == null) {
+      // Nenhum usuário logado
+      state = const AuthState();
+      return;
     }
 
-    state = const AuthState();
+    try {
+      // Busca os dados do usuário no Firestore
+      final doc = await _firestore
+          .collection('users')
+          .doc(firebaseUser.uid)
+          .get();
+
+      if (doc.exists && doc.data() != null) {
+        final userModel = UserModel.fromMap({
+          'id': firebaseUser.uid,
+          ...doc.data()!,
+        });
+        state = AuthState(user: userModel);
+      } else {
+        // Documento não existe ainda — cria um básico
+        final userModel = UserModel(
+          id:        firebaseUser.uid,
+          name:      firebaseUser.displayName ?? firebaseUser.email!.split('@')[0],
+          email:     firebaseUser.email ?? '',
+          phone:     '',
+          address:   '',
+          createdAt: DateTime.now(),
+        );
+        await _saveUserToFirestore(userModel);
+        state = AuthState(user: userModel);
+      }
+    } catch (e) {
+      _log('Erro ao carregar dados do usuário: $e');
+      state = const AuthState();
+    }
   }
 
   // ── Cadastro ──────────────────────────────────────────────────────────────
@@ -78,56 +95,63 @@ class AuthNotifier extends Notifier<AuthState> {
     required String address,
   }) async {
     state = state.copyWith(isLoading: true, clearError: true);
-    await Future.delayed(const Duration(milliseconds: 500));
 
-    final emailClean = email.trim().toLowerCase();
-
-    // Validações
-    if (name.trim().isEmpty || emailClean.isEmpty || password.isEmpty) {
-      state = state.copyWith(isLoading: false, errorMessage: 'Preencha nome, e-mail e senha');
+    // Validações locais
+    if (name.trim().isEmpty || email.trim().isEmpty || password.isEmpty) {
+      state = state.copyWith(
+          isLoading: false, errorMessage: 'Preencha nome, e-mail e senha');
       return false;
     }
-    if (!emailClean.contains('@') || !emailClean.contains('.')) {
-      state = state.copyWith(isLoading: false, errorMessage: 'E-mail inválido');
+    if (!email.contains('@') || !email.contains('.')) {
+      state = state.copyWith(
+          isLoading: false, errorMessage: 'E-mail inválido');
       return false;
     }
     if (password.length < 6) {
-      state = state.copyWith(isLoading: false, errorMessage: 'Senha deve ter pelo menos 6 caracteres');
+      state = state.copyWith(
+          isLoading: false,
+          errorMessage: 'Senha deve ter pelo menos 6 caracteres');
       return false;
     }
 
     try {
-      final prefs = await _getPrefs();
+      // Cria o usuário no Firebase Authentication
+      final credential = await _auth.createUserWithEmailAndPassword(
+        email:    email.trim().toLowerCase(),
+        password: password,
+      );
 
-      // Verifica duplicidade
-      final existing = _getUserByEmail(prefs, emailClean);
-      if (existing != null) {
-        state = state.copyWith(isLoading: false, errorMessage: 'Este e-mail já está cadastrado. Faça login.');
-        return false;
-      }
+      final firebaseUser = credential.user!;
 
-      // Cria e salva o usuário
-      final userId = 'u${DateTime.now().millisecondsSinceEpoch}';
+      // Atualiza o nome no Firebase Auth
+      await firebaseUser.updateDisplayName(name.trim());
+
+      // Salva os dados completos no Firestore
       final newUser = UserModel(
-        id:        userId,
+        id:        firebaseUser.uid,
         name:      name.trim(),
-        email:     emailClean,
+        email:     email.trim().toLowerCase(),
         phone:     phone.trim(),
         address:   address.trim(),
         createdAt: DateTime.now(),
       );
 
-      _saveUser(prefs, newUser, password);
-      await prefs.setString(_kLoggedUserId, userId);
+      await _saveUserToFirestore(newUser);
 
-      _log('Cadastro OK: $emailClean | userId: $userId');
-      _log('UsersMap após cadastro: ${prefs.getString(_kUsersMap)}');
-
+      _log('Cadastro OK: ${newUser.email}');
       state = AuthState(user: newUser);
       return true;
+
+    } on FirebaseAuthException catch (e) {
+      state = state.copyWith(
+          isLoading: false,
+          errorMessage: _translateFirebaseError(e.code));
+      return false;
     } catch (e) {
       _log('Erro no cadastro: $e');
-      state = state.copyWith(isLoading: false, errorMessage: 'Erro ao cadastrar. Tente novamente.');
+      state = state.copyWith(
+          isLoading: false,
+          errorMessage: 'Erro ao cadastrar. Tente novamente.');
       return false;
     }
   }
@@ -135,115 +159,77 @@ class AuthNotifier extends Notifier<AuthState> {
   // ── Login ─────────────────────────────────────────────────────────────────
   Future<bool> login(String email, String password) async {
     state = state.copyWith(isLoading: true, clearError: true);
-    await Future.delayed(const Duration(milliseconds: 500));
 
-    final emailClean = email.trim().toLowerCase();
-
-    if (emailClean.isEmpty || password.isEmpty) {
-      state = state.copyWith(isLoading: false, errorMessage: 'Preencha e-mail e senha');
+    if (email.trim().isEmpty || password.isEmpty) {
+      state = state.copyWith(
+          isLoading: false, errorMessage: 'Preencha e-mail e senha');
       return false;
     }
 
     try {
-      final prefs = await _getPrefs();
+      await _auth.signInWithEmailAndPassword(
+        email:    email.trim().toLowerCase(),
+        password: password,
+      );
 
-      _log('Tentando login: $emailClean');
-      _log('UsersMap atual: ${prefs.getString(_kUsersMap)}');
-
-      final user = _getUserByEmail(prefs, emailClean);
-
-      if (user == null) {
-        state = state.copyWith(isLoading: false, errorMessage: 'E-mail não encontrado. Faça seu cadastro.');
-        return false;
-      }
-
-      final savedPassword = _getPassword(prefs, user.id);
-      _log('Senha salva: $savedPassword | Senha digitada: $password');
-
-      if (savedPassword != password) {
-        state = state.copyWith(isLoading: false, errorMessage: 'Senha incorreta.');
-        return false;
-      }
-
-      await prefs.setString(_kLoggedUserId, user.id);
-      state = AuthState(user: user);
+      _log('Login OK: ${email.trim()}');
       return true;
+
+    } on FirebaseAuthException catch (e) {
+      state = state.copyWith(
+          isLoading: false,
+          errorMessage: _translateFirebaseError(e.code));
+      return false;
     } catch (e) {
       _log('Erro no login: $e');
-      state = state.copyWith(isLoading: false, errorMessage: 'Erro ao fazer login. Tente novamente.');
+      state = state.copyWith(
+          isLoading: false,
+          errorMessage: 'Erro ao fazer login. Tente novamente.');
       return false;
     }
   }
 
   // ── Logout ────────────────────────────────────────────────────────────────
   Future<void> logout() async {
-    final prefs = await _getPrefs();
-    await prefs.remove(_kLoggedUserId);
+    await _auth.signOut();
     state = const AuthState();
   }
 
-  // ─── Helpers síncronos (não precisam de await) ────────────────────────────
-
-  void _saveUser(SharedPreferences prefs, UserModel user, String password) {
-    final raw  = prefs.getString(_kUsersMap) ?? '{}';
-    final Map<String, dynamic> users = jsonDecode(raw);
-
-    // Salva dados do usuário + senha na mesma entrada
-    users[user.id] = {
-      'id':        user.id,
+  // ── Salva usuário no Firestore ────────────────────────────────────────────
+  Future<void> _saveUserToFirestore(UserModel user) async {
+    await _firestore.collection('users').doc(user.id).set({
       'name':      user.name,
       'email':     user.email,
       'phone':     user.phone,
       'address':   user.address,
       'createdAt': user.createdAt.toIso8601String(),
-      'password':  password,
-    };
-
-    prefs.setString(_kUsersMap, jsonEncode(users));
+    });
   }
 
-  UserModel? _getUserById(SharedPreferences prefs, String userId) {
-    final raw = prefs.getString(_kUsersMap) ?? '{}';
-    final Map<String, dynamic> users = jsonDecode(raw);
-    final data = users[userId];
-    if (data == null) return null;
-    try {
-      return UserModel.fromMap(Map<String, dynamic>.from(data as Map));
-    } catch (_) {
-      return null;
+  // ── Traduz erros do Firebase para português ───────────────────────────────
+  String _translateFirebaseError(String code) {
+    switch (code) {
+      case 'email-already-in-use':
+        return 'Este e-mail já está cadastrado. Faça login.';
+      case 'invalid-email':
+        return 'E-mail inválido.';
+      case 'weak-password':
+        return 'Senha muito fraca. Use pelo menos 6 caracteres.';
+      case 'user-not-found':
+        return 'E-mail não encontrado. Faça seu cadastro.';
+      case 'wrong-password':
+        return 'Senha incorreta.';
+      case 'invalid-credential':
+        return 'E-mail ou senha incorretos.';
+      case 'too-many-requests':
+        return 'Muitas tentativas. Aguarde alguns minutos e tente novamente.';
+      case 'network-request-failed':
+        return 'Sem conexão com a internet. Verifique sua rede.';
+      case 'user-disabled':
+        return 'Esta conta foi desativada.';
+      default:
+        return 'Erro de autenticação. Tente novamente.';
     }
-  }
-
-  UserModel? _getUserByEmail(SharedPreferences prefs, String email) {
-    final raw = prefs.getString(_kUsersMap) ?? '{}';
-    final Map<String, dynamic> users = jsonDecode(raw);
-
-    for (final entry in users.values) {
-      final map = Map<String, dynamic>.from(entry as Map);
-      if ((map['email'] as String? ?? '').toLowerCase() == email) {
-        try {
-          return UserModel.fromMap(map);
-        } catch (_) {
-          continue;
-        }
-      }
-    }
-    return null;
-  }
-
-  String? _getPassword(SharedPreferences prefs, String userId) {
-    final raw = prefs.getString(_kUsersMap) ?? '{}';
-    final Map<String, dynamic> users = jsonDecode(raw);
-    final data = users[userId];
-    if (data == null) return null;
-    return (data as Map)['password'] as String?;
-  }
-
-  // Obtém uma instância fresca do SharedPreferences
-  Future<SharedPreferences> _getPrefs() async {
-    // Recarrega para garantir dados mais recentes (importante no Flutter Web)
-    SharedPreferences.resetStatic();
-    return SharedPreferences.getInstance();
   }
 
   void _log(String msg) {

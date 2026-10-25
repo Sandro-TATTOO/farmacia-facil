@@ -1,27 +1,36 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
 import 'app/theme.dart';
 import 'app/routes.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+
   runApp(
-    // ProviderScope é obrigatório para o Riverpod funcionar
     const ProviderScope(
       child: FarmaciaFacilApp(),
     ),
   );
 }
 
-class FarmaciaFacilApp extends StatelessWidget {
+class FarmaciaFacilApp extends ConsumerWidget {
   const FarmaciaFacilApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final router = createRouter(ref);
+
     return MaterialApp.router(
       title: 'Farmácia Fácil',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
-      routerConfig: appRouter,
+      routerConfig: router,
     );
   }
 }

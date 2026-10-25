@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "705931971359",
+    "project_id": "farmacia-facil-b980c",
+    "storage_bucket": "farmacia-facil-b980c.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:705931971359:android:d5996baebbb5b662cabe2a",
+        "android_client_info": {
+          "package_name": "com.farmaciafacil.farmacia_facil"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCjHj5Z3bClvc_wl-3kUvop6BFmoyarAK8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,0 +1,252 @@
+================================================================
+  FARMÁCIA FÁCIL — RELATÓRIO DE DESENVOLVIMENTO
+  Atualizado: Outubro 2026
+================================================================
+
+----------------------------------------------------------------
+1. AMBIENTE DE DESENVOLVIMENTO
+----------------------------------------------------------------
+
+Sistema Operacional : Windows 10 Home 64-bit
+Flutter             : 3.38.5 (canal stable)
+Dart                : 3.10.4
+Android SDK         : 36.1.0
+Git                 : 2.54.0
+Editor              : Kiro IDE
+Licenças Android    : Aceitas e configuradas
+Chrome              : Disponível para testes Web
+Visual Studio 2026  : Instalado (necessário para builds Windows)
+
+Status do ambiente  : 100% configurado e funcional
+
+
+----------------------------------------------------------------
+2. PROJETO
+----------------------------------------------------------------
+
+Nome do app         : Farmácia Fácil
+Pasta local         : C:\Users\YYYY\Documents\farmacia.facio
+Repositório GitHub  : https://github.com/Sandro-TATTOO/farmacia-facil
+Branch principal    : main
+Plataformas alvo    : Android + Web
+
+
+----------------------------------------------------------------
+3. PUBLICAÇÃO WEB
+----------------------------------------------------------------
+
+  [OK] App publicado e acessível publicamente na internet
+  [OK] GitHub Actions configurado (deploy automático)
+  [OK] GitHub Pages ativado
+
+  Link público do app:
+  https://sandro-tattoo.github.io/farmacia-facil/
+
+  Como funciona o deploy automático:
+  - Toda vez que fizer git push para o branch main
+  - O GitHub Actions compila o Flutter automaticamente
+  - E publica a nova versão no link acima
+  - Sem precisar fazer nada manualmente
+
+  Acompanhar deploys:
+  https://github.com/Sandro-TATTOO/farmacia-facil/actions
+
+
+----------------------------------------------------------------
+4. DEPENDÊNCIAS INSTALADAS
+----------------------------------------------------------------
+
+flutter_riverpod    : Gerenciamento de estado do app
+go_router           : Navegação entre telas
+shared_preferences  : Armazenamento local de dados
+google_fonts        : Fontes personalizadas
+flutter_local_noti. : Lembretes e notificações
+intl                : Formatação de datas em português
+
+
+----------------------------------------------------------------
+5. ESTRUTURA DE ARQUIVOS CRIADOS
+----------------------------------------------------------------
+
+lib/
+├── main.dart                        Ponto de entrada do app
+├── app/
+│   ├── theme.dart                   Cores e estilo visual
+│   └── routes.dart                  Navegação entre telas
+├── models/
+│   ├── user_model.dart              Estrutura de dados do usuário
+│   ├── medication_model.dart        Estrutura de dados dos remédios
+│   ├── pharmacy_model.dart          Estrutura de dados das farmácias
+│   └── health_tip_model.dart        Estrutura de dados das dicas
+├── providers/
+│   ├── auth_provider.dart           Login, cadastro, sessão e logout
+│   └── medication_provider.dart     Lista e controle de remédios
+├── screens/
+│   ├── auth/
+│   │   ├── splash_screen.dart       Tela inicial com logo animado
+│   │   ├── login_screen.dart        Tela de login
+│   │   └── register_screen.dart     Tela de cadastro
+│   ├── user/
+│   │   ├── home_screen.dart         Tela principal do usuário
+│   │   ├── medications_screen.dart  Gerenciamento de remédios
+│   │   ├── pharmacies_screen.dart   Lista de farmácias próximas
+│   │   ├── health_tips_screen.dart  Dicas de saúde e bem-estar
+│   │   └── profile_screen.dart      Perfil e configurações
+│   └── shared/
+│       └── main_shell.dart          Barra de navegação inferior
+└── assets/
+    ├── images/
+    └── icons/
+
+.github/
+└── workflows/
+    └── deploy.yml                   Deploy automático GitHub Pages
+
+Total de arquivos de código: 16 arquivos Dart
+
+
+----------------------------------------------------------------
+6. FUNCIONALIDADES IMPLEMENTADAS E FUNCIONAIS
+----------------------------------------------------------------
+
+AUTENTICAÇÃO
+  [OK] Tela de splash com animação de entrada (logo verde)
+  [OK] Cadastro com nome, e-mail, telefone, endereço e senha
+  [OK] Validação de campos obrigatórios
+  [OK] Verificação de e-mail duplicado no cadastro
+  [OK] Login com e-mail e senha
+  [OK] Verificação de senha correta no login
+  [OK] Sessão salva localmente (usuário não precisa logar toda vez)
+  [OK] Logout com limpeza de sessão
+  [OK] Redirecionamento automático para Home ou Login
+
+TELA HOME
+  [OK] Saudação com nome do usuário
+  [OK] Cards de resumo (remédios ativos, farmácias, dicas)
+  [OK] 4 ações rápidas (Adicionar Remédio, Buscar Farmácia,
+       Lembretes, Dicas de Saúde)
+  [OK] Lista de próximas doses do dia
+  [OK] Alerta visual quando remédio está acabando
+  [OK] Aviso médico informativo
+
+REMÉDIOS
+  [OK] Adicionar remédio (nome, dosagem, horários, duração)
+  [OK] Escolha de quantas vezes por dia (1x, 2x, 3x, 4x)
+  [OK] Escolha de duração (7, 14, 21, 30 ou 60 dias)
+  [OK] Barra de progresso de comprimidos restantes
+  [OK] Botão "Registrar dose tomada"
+  [OK] Alerta visual quando estoque abaixo de 20%
+  [OK] Remover remédio
+  [OK] Dados salvos localmente no dispositivo
+
+FARMÁCIAS
+  [OK] Lista de farmácias com distância
+  [OK] Status aberta/fechada
+  [OK] Avaliação por estrelas
+  [OK] Indicação de entrega disponível
+  [OK] Horário de funcionamento
+  [OK] Botões Ligar e Fazer Pedido (estrutura pronta)
+  [OK] Barra de busca (estrutura pronta)
+  [OK] Filtros por categoria (estrutura pronta)
+  NOTA: Dados são exemplos — integração com API real é Fase 2
+
+DICAS DE SAÚDE
+  [OK] 8 dicas organizadas por categoria
+  [OK] Categorias: Medicamentos, Alimentação, Exercícios,
+       Prevenção, Sono, Saúde Mental, Hidratação
+  [OK] Abas por categoria
+  [OK] Tela de detalhe com conteúdo completo
+  [OK] Aviso de conteúdo informativo (não substitui médico)
+
+PERFIL
+  [OK] Exibição dos dados do usuário
+  [OK] Avatar com inicial do nome
+  [OK] Menu de configurações (estrutura pronta)
+  [OK] Sobre o app com aviso médico
+  [OK] Botão sair da conta
+
+VISUAL
+  [OK] Identidade visual verde e branco
+  [OK] Fonte Roboto (suporte completo ao português)
+  [OK] Barra de navegação inferior com 5 abas
+  [OK] Design responsivo (funciona no Chrome e Android)
+
+
+----------------------------------------------------------------
+7. INFRAESTRUTURA E VERSIONAMENTO
+----------------------------------------------------------------
+
+  [OK] Git inicializado no projeto
+  [OK] Repositório conectado ao GitHub
+  [OK] Primeiro commit realizado (145 arquivos, 8631 linhas)
+  [OK] Projeto enviado para o GitHub (branch main)
+  [OK] Arquivo .gitignore configurado corretamente
+  [OK] GitHub Actions configurado (deploy automático)
+  [OK] GitHub Pages ativado e funcionando
+  [OK] App publicado online e acessível publicamente
+
+
+----------------------------------------------------------------
+8. O QUE AINDA NÃO FOI DESENVOLVIDO (PRÓXIMAS FASES)
+----------------------------------------------------------------
+
+FASE 2 — Pedidos
+  [ ] Sistema de pedidos dentro do app
+  [ ] Endereço temporário além do fixo
+  [ ] Confirmação de disponibilidade pela farmácia
+  [ ] Notificações de status do pedido
+
+FASE 3 — Recursos Inteligentes
+  [ ] OCR de receitas (câmera → identificar remédios)
+  [ ] Integração com Firebase (banco de dados em nuvem)
+  [ ] Google Maps real (farmácias reais por localização)
+  [ ] Notificações push nos horários dos remédios
+  [ ] Painel da farmácia (cadastro, estoque, pedidos)
+  [ ] Painel do entregador
+  [ ] Alerta de reposição automático com sugestão de pedido
+
+MELHORIAS PLANEJADAS
+  [ ] Testes no celular Android físico
+  [ ] Ícone personalizado do app
+  [ ] Tela de splash com logo real da marca
+  [ ] Integração Firebase Authentication
+  [ ] Integração Firebase Firestore (dados em nuvem)
+  [ ] Trocar token GitHub quando entrar em produção
+
+
+----------------------------------------------------------------
+9. COMO RODAR O PROJETO LOCALMENTE
+----------------------------------------------------------------
+
+No terminal, dentro da pasta do projeto:
+
+  Rodar no Chrome (Web):
+    flutter run -d chrome
+
+  Rodar no Android (com celular conectado via USB):
+    flutter run -d android
+
+  Compilar versão de produção Web:
+    flutter build web --release --base-href "/farmacia-facil/"
+
+  Enviar atualizações para o GitHub (deploy automático):
+    git add .
+    git commit -m "Descrição do que foi alterado"
+    git push origin main
+
+
+----------------------------------------------------------------
+10. OBSERVAÇÕES IMPORTANTES
+----------------------------------------------------------------
+
+  - O app é uma ferramenta de apoio informativo
+  - Não substitui orientação médica profissional
+  - Dados de usuários salvos localmente (sem nuvem por enquanto)
+  - Farmácias exibidas são dados de exemplo
+  - Login e cadastro funcionam com armazenamento local
+  - Ao fechar e abrir o app, o usuário permanece logado
+  - Token GitHub deve ser renovado ao entrar em produção
+
+================================================================
+  FIM DO RELATÓRIO
+================================================================
