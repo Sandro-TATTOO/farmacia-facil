@@ -1,3 +1,25 @@
+# Arquivos de build web (gerados automaticamente)
+canvaskit/
+assets/AssetManifest.bin
+assets/AssetManifest.bin.json
+assets/FontManifest.json
+assets/NOTICES
+assets/fonts/
+assets/shaders/
+assets/packages/
+flutter.js
+flutter_bootstrap.js
+flutter_service_worker.js
+main.dart.js
+main.dart.js.map
+main.dart.js_*.part
+index.html
+manifest.json
+favicon.png
+icons/
+version.json
+.last_build_id
+
 # Arquivos gerados pelo Flutter/Dart
 .dart_tool/
 .flutter-plugins
