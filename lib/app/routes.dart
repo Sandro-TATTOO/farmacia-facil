@@ -14,25 +14,42 @@ import '../screens/shared/main_shell.dart';
 
 const _publicRoutes = ['/splash', '/login', '/register'];
 
-GoRouter createRouter(Ref ref) {
-  // Listenable que notifica o GoRouter quando o auth muda
-  final authNotifier = _AuthChangeNotifier(ref);
+// Notifier que o GoRouter escuta para saber quando redirecionar
+class AuthRouterNotifier extends ChangeNotifier {
+  AuthState _authState;
+
+  AuthRouterNotifier(AuthState initialState) : _authState = initialState;
+
+  AuthState get authState => _authState;
+
+  void update(AuthState newState) {
+    if (_authState.isLoggedIn != newState.isLoggedIn ||
+        _authState.isLoading  != newState.isLoading) {
+      _authState = newState;
+      notifyListeners();
+    }
+  }
+}
+
+GoRouter createRouter(WidgetRef ref) {
+  // Cria o notifier com o estado inicial
+  final notifier = AuthRouterNotifier(ref.read(authProvider));
+
+  // Escuta mudanças no authProvider e atualiza o notifier
+  ref.listen<AuthState>(authProvider, (_, next) {
+    notifier.update(next);
+  });
 
   return GoRouter(
     initialLocation: '/splash',
-    refreshListenable: authNotifier,
+    refreshListenable: notifier,
     redirect: (context, state) {
-      final authState = ref.read(authProvider);
-      final isPublic  = _publicRoutes.contains(state.matchedLocation);
+      final auth     = notifier.authState;
+      final isPublic = _publicRoutes.contains(state.matchedLocation);
 
-      // Ainda carregando — fica na splash
-      if (authState.isLoading) return '/splash';
-
-      // Não logado em rota protegida → vai para login
-      if (!authState.isLoggedIn && !isPublic) return '/login';
-
-      // Logado em rota pública → vai para home
-      if (authState.isLoggedIn && isPublic) return '/home';
+      if (auth.isLoading)               return '/splash';
+      if (!auth.isLoggedIn && !isPublic) return '/login';
+      if (auth.isLoggedIn  && isPublic)  return '/home';
 
       return null;
     },
@@ -76,16 +93,4 @@ GoRouter createRouter(Ref ref) {
       ),
     ],
   );
-}
-
-// Notifica o GoRouter quando o estado de autenticação muda
-class _AuthChangeNotifier extends ChangeNotifier {
-  _AuthChangeNotifier(Ref ref) {
-    ref.listen(authProvider, (previous, next) {
-      if (previous?.isLoggedIn != next.isLoggedIn ||
-          previous?.isLoading  != next.isLoading) {
-        notifyListeners();
-      }
-    });
-  }
 }

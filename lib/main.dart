@@ -13,11 +13,7 @@ void main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
-  runApp(
-    const ProviderScope(
-      child: FarmaciaFacilApp(),
-    ),
-  );
+  runApp(const ProviderScope(child: FarmaciaFacilApp()));
 }
 
 class FarmaciaFacilApp extends ConsumerStatefulWidget {
@@ -28,13 +24,13 @@ class FarmaciaFacilApp extends ConsumerStatefulWidget {
 }
 
 class _FarmaciaFacilAppState extends ConsumerState<FarmaciaFacilApp> {
-  // Router criado uma única vez — não recria a cada rebuild
   late final GoRouter _router;
 
   @override
   void initState() {
     super.initState();
-    _router = createRouter(ref as Ref);
+    // createRouter usa ref.read internamente — seguro no initState
+    _router = createRouter(ref);
   }
 
   @override
