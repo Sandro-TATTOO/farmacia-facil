@@ -16,34 +16,22 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
   late AnimationController _animController;
   late Animation<double>   _fadeAnim;
   late Animation<double>   _scaleAnim;
-
-  bool _minTimeElapsed = false; // garante tempo mínimo na splash
-  bool _authReady      = false; // auth já carregou?
-  bool _navigated      = false;
-  AuthState? _pendingState;
+  bool _navigated = false;
 
   @override
   void initState() {
     super.initState();
 
-    // Animação de entrada
     _animController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1200),
     );
-    _fadeAnim  = Tween<double>(begin: 0, end: 1).animate(
+    _fadeAnim = Tween<double>(begin: 0, end: 1).animate(
         CurvedAnimation(parent: _animController, curve: Curves.easeIn));
     _scaleAnim = Tween<double>(begin: 0.6, end: 1).animate(
         CurvedAnimation(parent: _animController, curve: Curves.elasticOut));
 
     _animController.forward();
-
-    // Tempo mínimo de 2 segundos na splash (para o usuário ver o logo)
-    Future.delayed(const Duration(seconds: 2), () {
-      if (!mounted) return;
-      _minTimeElapsed = true;
-      _tryNavigate(_pendingState ?? const AuthState());
-    });
   }
 
   @override
@@ -52,11 +40,9 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
     super.dispose();
   }
 
-  void _tryNavigate(AuthState authState) {
-    _pendingState = authState;
+  void _navigate(AuthState authState) {
     if (_navigated) return;
-    if (!_minTimeElapsed) return; // aguarda animação
-    if (!_authReady) return;      // aguarda auth carregar
+    if (authState.isLoading) return;
 
     _navigated = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -71,16 +57,9 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
 
   @override
   Widget build(BuildContext context) {
+    // Observa o provider e navega quando isLoading virar false
     final authState = ref.watch(authProvider);
-
-    // Marca auth como pronto quando isLoading for false
-    if (!authState.isLoading && !_authReady) {
-      _authReady = true;
-      // Chama no próximo frame para não modificar estado durante build
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _tryNavigate(authState);
-      });
-    }
+    _navigate(authState);
 
     return Scaffold(
       backgroundColor: AppTheme.primaryGreen,
@@ -92,7 +71,6 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // Logo
                 Container(
                   width: 120,
                   height: 120,

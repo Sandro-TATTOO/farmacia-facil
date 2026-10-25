@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'app/theme.dart';
@@ -13,31 +12,15 @@ void main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
-  runApp(const ProviderScope(child: FarmaciaFacilApp()));
+  runApp(
+    const ProviderScope(
+      child: FarmaciaFacilApp(),
+    ),
+  );
 }
 
-class FarmaciaFacilApp extends ConsumerStatefulWidget {
+class FarmaciaFacilApp extends StatelessWidget {
   const FarmaciaFacilApp({super.key});
-
-  @override
-  ConsumerState<FarmaciaFacilApp> createState() => _FarmaciaFacilAppState();
-}
-
-class _FarmaciaFacilAppState extends ConsumerState<FarmaciaFacilApp> {
-  late final GoRouter _router;
-
-  @override
-  void initState() {
-    super.initState();
-    // createRouter usa ref.read internamente — seguro no initState
-    _router = createRouter(ref);
-  }
-
-  @override
-  void dispose() {
-    _router.dispose();
-    super.dispose();
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -45,7 +28,7 @@ class _FarmaciaFacilAppState extends ConsumerState<FarmaciaFacilApp> {
       title: 'Farmácia Fácil',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
-      routerConfig: _router,
+      routerConfig: appRouter,
     );
   }
 }
