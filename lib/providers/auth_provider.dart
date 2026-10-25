@@ -35,51 +35,65 @@ class AuthState {
 
 // ─── Notifier ────────────────────────────────────────────────────────────────
 class AuthNotifier extends Notifier<AuthState> {
-  // Instâncias do Firebase
   final _auth      = FirebaseAuth.instance;
   final _firestore = FirebaseFirestore.instance;
 
+  // Flag para evitar dupla atualização durante cadastro/login
+  bool _ignoreNextAuthChange = false;
+
   @override
   AuthState build() {
-    // Escuta mudanças de autenticação em tempo real
+    // Escuta mudanças de autenticação do Firebase em tempo real
     _auth.authStateChanges().listen(_onAuthStateChanged);
     return const AuthState(isLoading: true);
   }
 
-  // Chamado automaticamente quando o usuário loga ou desloga
+  // Disparado automaticamente pelo Firebase quando o usuário loga/desloga
   Future<void> _onAuthStateChanged(User? firebaseUser) async {
+    // Se estamos no meio de um login/cadastro manual, ignora esta chamada
+    if (_ignoreNextAuthChange) {
+      _ignoreNextAuthChange = false;
+      return;
+    }
+
     if (firebaseUser == null) {
-      // Nenhum usuário logado
       state = const AuthState();
       return;
     }
 
+    await _loadUserFromFirestore(firebaseUser);
+  }
+
+  // Busca dados do usuário no Firestore e atualiza o estado
+  Future<void> _loadUserFromFirestore(User firebaseUser) async {
     try {
-      // Busca os dados do usuário no Firestore
       final doc = await _firestore
           .collection('users')
           .doc(firebaseUser.uid)
           .get();
 
+      UserModel userModel;
+
       if (doc.exists && doc.data() != null) {
-        final userModel = UserModel.fromMap({
+        userModel = UserModel.fromMap({
           'id': firebaseUser.uid,
           ...doc.data()!,
         });
-        state = AuthState(user: userModel);
       } else {
-        // Documento não existe ainda — cria um básico
-        final userModel = UserModel(
+        // Documento não existe — cria um básico
+        userModel = UserModel(
           id:        firebaseUser.uid,
-          name:      firebaseUser.displayName ?? firebaseUser.email!.split('@')[0],
+          name:      firebaseUser.displayName ??
+                     firebaseUser.email!.split('@')[0],
           email:     firebaseUser.email ?? '',
           phone:     '',
           address:   '',
           createdAt: DateTime.now(),
         );
         await _saveUserToFirestore(userModel);
-        state = AuthState(user: userModel);
       }
+
+      state = AuthState(user: userModel);
     } catch (e) {
       _log('Erro ao carregar dados do usuário: $e');
       state = const AuthState();
@@ -96,7 +110,7 @@ class AuthNotifier extends Notifier<AuthState> {
   }) async {
     state = state.copyWith(isLoading: true, clearError: true);
 
-    // Validações locais
+    // Validações
     if (name.trim().isEmpty || email.trim().isEmpty || password.isEmpty) {
       state = state.copyWith(
           isLoading: false, errorMessage: 'Preencha nome, e-mail e senha');
@@ -115,18 +129,17 @@ class AuthNotifier extends Notifier<AuthState> {
     }
 
     try {
-      // Cria o usuário no Firebase Authentication
+      // Evita que _onAuthStateChanged trate este evento
+      _ignoreNextAuthChange = true;
+
       final credential = await _auth.createUserWithEmailAndPassword(
         email:    email.trim().toLowerCase(),
         password: password,
       );
 
       final firebaseUser = credential.user!;
-
-      // Atualiza o nome no Firebase Auth
       await firebaseUser.updateDisplayName(name.trim());
 
-      // Salva os dados completos no Firestore
       final newUser = UserModel(
         id:        firebaseUser.uid,
         name:      name.trim(),
@@ -139,15 +152,18 @@ class AuthNotifier extends Notifier<AuthState> {
       await _saveUserToFirestore(newUser);
 
       _log('Cadastro OK: ${newUser.email}');
+      // Atualiza estado diretamente — sem passar pelo listener
       state = AuthState(user: newUser);
       return true;
 
     } on FirebaseAuthException catch (e) {
+      _ignoreNextAuthChange = false;
       state = state.copyWith(
           isLoading: false,
           errorMessage: _translateFirebaseError(e.code));
       return false;
     } catch (e) {
+      _ignoreNextAuthChange = false;
       _log('Erro no cadastro: $e');
       state = state.copyWith(
           isLoading: false,
@@ -167,20 +183,28 @@ class AuthNotifier extends Notifier<AuthState> {
     }
 
     try {
-      await _auth.signInWithEmailAndPassword(
+      // Evita que _onAuthStateChanged trate este evento
+      _ignoreNextAuthChange = true;
+
+      final credential = await _auth.signInWithEmailAndPassword(
         email:    email.trim().toLowerCase(),
         password: password,
       );
+
+      // Carrega dados do Firestore e atualiza estado diretamente
+      await _loadUserFromFirestore(credential.user!);
 
       _log('Login OK: ${email.trim()}');
       return true;
 
     } on FirebaseAuthException catch (e) {
+      _ignoreNextAuthChange = false;
       state = state.copyWith(
           isLoading: false,
           errorMessage: _translateFirebaseError(e.code));
       return false;
     } catch (e) {
+      _ignoreNextAuthChange = false;
       _log('Erro no login: $e');
       state = state.copyWith(
           isLoading: false,
@@ -195,7 +219,7 @@ class AuthNotifier extends Notifier<AuthState> {
     state = const AuthState();
   }
 
-  // ── Salva usuário no Firestore ────────────────────────────────────────────
+  // ── Salva no Firestore ────────────────────────────────────────────────────
   Future<void> _saveUserToFirestore(UserModel user) async {
     await _firestore.collection('users').doc(user.id).set({
       'name':      user.name,
@@ -206,7 +230,7 @@ class AuthNotifier extends Notifier<AuthState> {
     });
   }
 
-  // ── Traduz erros do Firebase para português ───────────────────────────────
+  // ── Traduz erros do Firebase ──────────────────────────────────────────────
   String _translateFirebaseError(String code) {
     switch (code) {
       case 'email-already-in-use':
@@ -216,19 +240,17 @@ class AuthNotifier extends Notifier<AuthState> {
       case 'weak-password':
         return 'Senha muito fraca. Use pelo menos 6 caracteres.';
       case 'user-not-found':
-        return 'E-mail não encontrado. Faça seu cadastro.';
       case 'wrong-password':
-        return 'Senha incorreta.';
       case 'invalid-credential':
         return 'E-mail ou senha incorretos.';
       case 'too-many-requests':
-        return 'Muitas tentativas. Aguarde alguns minutos e tente novamente.';
+        return 'Muitas tentativas. Aguarde alguns minutos.';
       case 'network-request-failed':
-        return 'Sem conexão com a internet. Verifique sua rede.';
+        return 'Sem conexão com a internet.';
       case 'user-disabled':
         return 'Esta conta foi desativada.';
       default:
-        return 'Erro de autenticação. Tente novamente.';
+        return 'Erro de autenticação ($code). Tente novamente.';
     }
   }
 

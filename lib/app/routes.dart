@@ -12,41 +12,34 @@ import '../screens/user/health_tips_screen.dart';
 import '../screens/user/profile_screen.dart';
 import '../screens/shared/main_shell.dart';
 
-// Rotas que não precisam de login
 const _publicRoutes = ['/splash', '/login', '/register'];
 
-// Cria o router com proteção de rotas baseada no estado de autenticação
 GoRouter createRouter(WidgetRef ref) {
+  // ref.watch garante que o router reage a mudanças no authProvider
+  final authState = ref.watch(authProvider);
+
   return GoRouter(
     initialLocation: '/splash',
+    refreshListenable: _AuthNotifier(ref),
     redirect: (context, state) {
-      final authState = ref.read(authProvider);
-      final isPublic  = _publicRoutes.contains(state.matchedLocation);
+      final isPublic = _publicRoutes.contains(state.matchedLocation);
 
       // Ainda carregando — fica na splash
       if (authState.isLoading) return '/splash';
 
-      // Não logado tentando acessar rota protegida → vai para login
+      // Não logado em rota protegida → login
       if (!authState.isLoggedIn && !isPublic) return '/login';
 
-      // Logado tentando acessar login/cadastro → vai para home
-      if (authState.isLoggedIn &&
-          (state.matchedLocation == '/login' ||
-           state.matchedLocation == '/register' ||
-           state.matchedLocation == '/splash')) {
-        return '/home';
-      }
+      // Logado em rota pública → home
+      if (authState.isLoggedIn && isPublic) return '/home';
 
-      return null; // sem redirecionamento
+      return null;
     },
     routes: [
-      // Splash
       GoRoute(
         path: '/splash',
         builder: (context, state) => const SplashScreen(),
       ),
-
-      // Autenticação
       GoRoute(
         path: '/login',
         builder: (context, state) => const LoginScreen(),
@@ -55,8 +48,6 @@ GoRouter createRouter(WidgetRef ref) {
         path: '/register',
         builder: (context, state) => const RegisterScreen(),
       ),
-
-      // App principal com barra de navegação
       ShellRoute(
         builder: (context, state, child) => MainShell(child: child),
         routes: [
@@ -86,5 +77,15 @@ GoRouter createRouter(WidgetRef ref) {
   );
 }
 
-// Provider do router — permite que o GoRouter leia o authProvider
-final routerProvider = Provider<GoRouter>((ref) => createRouter(ref as WidgetRef));
+// Listenable que notifica o GoRouter quando o authProvider muda
+class _AuthNotifier extends ChangeNotifier {
+  _AuthNotifier(WidgetRef ref) {
+    ref.listen(authProvider, (previous, next) {
+      // Notifica o router sempre que o estado de auth mudar
+      if (previous?.isLoggedIn != next.isLoggedIn ||
+          previous?.isLoading != next.isLoading) {
+        notifyListeners();
+      }
+    });
+  }
+}
