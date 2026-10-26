@@ -1,16 +1,11 @@
-import 'dart:typed_data';
-import 'dart:convert';
+import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:http/http.dart' as http;
+import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import '../../app/theme.dart';
-
-const _geminiApiKey = String.fromEnvironment(
-  'GEMINI_API_KEY',
-  defaultValue: '',
-);
 
 class PrescriptionScreen extends ConsumerStatefulWidget {
   const PrescriptionScreen({super.key});
@@ -21,137 +16,202 @@ class PrescriptionScreen extends ConsumerStatefulWidget {
 }
 
 class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
-  Uint8List?           _imageBytes;
-  bool                 _isAnalyzing = false;
-  List<_Medicine>      _medicines   = [];
-  String?              _errorMessage;
+  XFile?            _imageFile;
+  bool              _isAnalyzing = false;
+  List<_Medicine>   _medicines   = [];
+  String?           _errorMessage;
+  String            _rawText     = '';
 
   final _picker = ImagePicker();
 
-  // Seleciona imagem da câmera ou galeria
   Future<void> _pickImage(ImageSource source) async {
     try {
       final picked = await _picker.pickImage(
-        source:  source,
-        maxWidth: 1200,
-        imageQuality: 85,
+        source:       source,
+        maxWidth:     1200,
+        imageQuality: 90,
       );
       if (picked == null) return;
 
-      final bytes = await picked.readAsBytes();
       setState(() {
-        _imageBytes    = bytes;
-        _medicines     = [];
-        _errorMessage  = null;
+        _imageFile    = picked;
+        _medicines    = [];
+        _errorMessage = null;
+        _rawText      = '';
       });
 
-      await _analyzeImage(bytes);
+      await _analyzeImage(picked);
     } catch (e) {
       setState(() => _errorMessage = 'Erro ao acessar a câmera/galeria.');
     }
   }
 
-  // Envia imagem para o Gemini e extrai medicamentos
-  Future<void> _analyzeImage(Uint8List bytes) async {
+  Future<void> _analyzeImage(XFile file) async {
     setState(() { _isAnalyzing = true; _errorMessage = null; });
 
     try {
-      if (_geminiApiKey.isEmpty) {
+      // ML Kit não funciona no Web — mostra mensagem
+      if (kIsWeb) {
         setState(() {
-          _errorMessage = 'Chave da API não configurada.';
+          _errorMessage = 'Para ler receitas, use o app no seu celular Android.';
           _isAnalyzing  = false;
         });
         return;
       }
 
-      final base64Image = base64Encode(bytes);
+      final inputImage  = InputImage.fromFilePath(file.path);
+      final recognizer  = TextRecognizer(script: TextRecognitionScript.latin);
+      final recognized  = await recognizer.processImage(inputImage);
+      await recognizer.close();
 
-      // Endpoint correto para chaves AQ. (novo formato Google AI Studio)
-      final url = Uri.parse(
-        'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent',
-      );
+      final text = recognized.text;
+      setState(() => _rawText = text);
 
-      final body = jsonEncode({
-        'contents': [
-          {
-            'parts': [
-              {
-                'text': '''Analise esta receita médica e extraia APENAS os nomes dos medicamentos prescritos.
-Retorne uma lista simples, um medicamento por linha, apenas o nome comercial ou genérico.
-Não inclua dosagens, quantidades ou instruções — apenas os nomes.
-Se não encontrar medicamentos, retorne apenas: NENHUM'''
-              },
-              {
-                'inline_data': {
-                  'mime_type': 'image/jpeg',
-                  'data': base64Image,
-                }
-              }
-            ]
-          }
-        ]
-      });
-
-      // Chaves AQ. usam header x-goog-api-key em vez de query param
-      final response = await http.post(
-        url,
-        headers: {
-          'Content-Type': 'application/json',
-          'x-goog-api-key': _geminiApiKey,
-        },
-        body: body,
-      ).timeout(const Duration(seconds: 30));
-
-      if (response.statusCode != 200) {
+      if (text.trim().isEmpty) {
         setState(() {
-          _errorMessage = 'Erro na API (${response.statusCode}). Tente novamente.';
+          _errorMessage = 'Nenhum texto encontrado. Tente uma foto mais nítida.';
           _isAnalyzing  = false;
         });
         return;
       }
 
-      final data = jsonDecode(response.body);
-      final text = data['candidates']?[0]?['content']?['parts']?[0]?['text'] as String? ?? '';
+      // Extrai possíveis medicamentos do texto
+      final medicines = _extractMedicines(text);
 
-      if (text.trim().toUpperCase().contains('NENHUM') || text.trim().isEmpty) {
+      if (medicines.isEmpty) {
         setState(() {
-          _medicines    = [];
-          _errorMessage = 'Nenhum medicamento identificado. Tente uma foto mais nítida.';
+          _errorMessage = 'Nenhum medicamento identificado. Verifique o texto abaixo e adicione manualmente.';
           _isAnalyzing  = false;
         });
         return;
       }
-
-      final lines = text
-          .split('\n')
-          .map((l) => l.trim())
-          .where((l) => l.isNotEmpty)
-          .map((l) => l.replaceAll(RegExp(r'^[\d\.\-\*\•]+\s*'), '').trim())
-          .where((l) => l.isNotEmpty && l.length > 2)
-          .toList();
 
       setState(() {
-        _medicines   = lines.map((name) => _Medicine(name: name)).toList();
+        _medicines   = medicines;
         _isAnalyzing = false;
       });
 
     } catch (e) {
       setState(() {
-        _errorMessage = 'Erro ao analisar a imagem. Verifique sua conexão.';
+        _errorMessage = 'Erro ao analisar a imagem. Tente novamente.';
         _isAnalyzing  = false;
       });
     }
   }
 
-  // Busca os medicamentos confirmados nas farmácias
+  // Extrai nomes de medicamentos do texto lido
+  List<_Medicine> _extractMedicines(String text) {
+    final lines = text
+        .split('\n')
+        .map((l) => l.trim())
+        .where((l) => l.length > 3)
+        .toList();
+
+    final medicines = <_Medicine>[];
+    final seen      = <String>{};
+
+    // Palavras que indicam que a linha é um medicamento
+    final medPatterns = RegExp(
+      r'(mg|ml|mcg|comprimido|cápsula|capsula|xarope|gotas|pomada|creme|solução|solucao|injetável|injetavel|'
+      r'ampola|frasco|bisnaga|supositório|supositorio|spray|aerossol|adesivo|parche)',
+      caseSensitive: false,
+    );
+
+    // Palavras a ignorar (não são medicamentos)
+    final ignoreWords = {
+      'receita', 'médico', 'medico', 'paciente', 'data', 'assinatura',
+      'carimbo', 'crm', 'endereço', 'endereco', 'telefone', 'nome',
+      'idade', 'cpf', 'rg', 'uso', 'interno', 'externo', 'dose',
+      'tomar', 'aplicar', 'via', 'oral', 'topica', 'tópica',
+      'vezes', 'dias', 'semanas', 'meses', 'horas',
+    };
+
+    for (final line in lines) {
+      final lower = line.toLowerCase();
+
+      // Ignora linhas muito curtas ou com palavras de cabeçalho
+      if (ignoreWords.any((w) => lower.contains(w))) continue;
+
+      // Linhas com padrão de medicamento (tem unidade como mg, ml, etc.)
+      if (medPatterns.hasMatch(lower)) {
+        // Pega só o nome (antes da dosagem)
+        final name = line
+            .split(RegExp(r'\s+\d'))
+            .first
+            .replaceAll(RegExp(r'[^a-zA-ZÀ-ÿ\s\-]'), '')
+            .trim();
+
+        if (name.length > 3 && !seen.contains(name.toLowerCase())) {
+          seen.add(name.toLowerCase());
+          medicines.add(_Medicine(name: name));
+        }
+      }
+    }
+
+    // Se não encontrou nada com padrão, sugere linhas que parecem nomes próprios
+    if (medicines.isEmpty) {
+      for (final line in lines) {
+        if (line.length < 4 || line.length > 50) continue;
+        final lower = line.toLowerCase();
+        if (ignoreWords.any((w) => lower.contains(w))) continue;
+
+        // Linha começa com maiúscula = possível nome de medicamento
+        if (line[0].toUpperCase() == line[0] &&
+            !line[0].contains(RegExp(r'\d')) &&
+            !seen.contains(lower)) {
+          seen.add(lower);
+          medicines.add(_Medicine(name: line.replaceAll(RegExp(r'[^a-zA-ZÀ-ÿ\s\-]'), '').trim()));
+          if (medicines.length >= 10) break;
+        }
+      }
+    }
+
+    return medicines.where((m) => m.name.length > 3).toList();
+  }
+
+  void _addManual() {
+    final ctrl = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Adicionar medicamento'),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          textCapitalization: TextCapitalization.words,
+          decoration: const InputDecoration(
+            hintText: 'Nome do medicamento',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              if (ctrl.text.trim().isNotEmpty) {
+                setState(() =>
+                    _medicines.add(_Medicine(name: ctrl.text.trim())));
+              }
+              Navigator.pop(ctx);
+            },
+            child: const Text('Adicionar'),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _searchInPharmacies() {
     final confirmed = _medicines.where((m) => m.confirmed).toList();
     if (confirmed.isEmpty) return;
 
-    final names = confirmed.map((m) => m.name).join(', ');
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Buscando: $names'),
+        content: Text(
+            'Buscando ${confirmed.length} medicamento(s) nas farmácias...'),
         backgroundColor: AppTheme.primaryGreen,
       ),
     );
@@ -184,7 +244,7 @@ Se não encontrar medicamentos, retorne apenas: NENHUM'''
                   SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      'Fotografe ou envie uma imagem da sua receita. O app vai identificar os medicamentos automaticamente.',
+                      'Fotografe sua receita. O app lê o texto e identifica os medicamentos automaticamente.',
                       style: TextStyle(color: AppTheme.primaryGreen),
                     ),
                   ),
@@ -194,11 +254,11 @@ Se não encontrar medicamentos, retorne apenas: NENHUM'''
             const SizedBox(height: 20),
 
             // Preview da imagem
-            if (_imageBytes != null) ...[
+            if (_imageFile != null && !kIsWeb) ...[
               ClipRRect(
                 borderRadius: BorderRadius.circular(16),
-                child: Image.memory(
-                  _imageBytes!,
+                child: Image.file(
+                  File(_imageFile!.path),
                   height: 220,
                   width: double.infinity,
                   fit: BoxFit.cover,
@@ -239,7 +299,7 @@ Se não encontrar medicamentos, retorne apenas: NENHUM'''
                 ),
               ],
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 20),
 
             // Analisando
             if (_isAnalyzing)
@@ -247,14 +307,14 @@ Se não encontrar medicamentos, retorne apenas: NENHUM'''
                 children: [
                   CircularProgressIndicator(),
                   SizedBox(height: 12),
-                  Text('Analisando a receita com IA...',
+                  Text('Lendo a receita...',
                       style: TextStyle(color: AppTheme.textGrey)),
                   SizedBox(height: 24),
                 ],
               ),
 
             // Erro
-            if (_errorMessage != null)
+            if (_errorMessage != null) ...[
               Container(
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
@@ -264,33 +324,42 @@ Se não encontrar medicamentos, retorne apenas: NENHUM'''
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.warning_amber,
-                        color: Colors.orange.shade700),
+                    Icon(Icons.warning_amber, color: Colors.orange.shade700),
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(_errorMessage!,
-                          style:
-                              TextStyle(color: Colors.orange.shade700)),
+                          style: TextStyle(color: Colors.orange.shade700)),
                     ),
                   ],
                 ),
               ),
+              const SizedBox(height: 12),
+            ],
 
             // Medicamentos encontrados
             if (_medicines.isNotEmpty) ...[
-              const Text(
-                'Medicamentos identificados',
-                style: TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.bold,
-                    color: AppTheme.textDark),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Medicamentos identificados',
+                    style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.bold,
+                        color: AppTheme.textDark),
+                  ),
+                  TextButton.icon(
+                    onPressed: _addManual,
+                    icon: const Icon(Icons.add, size: 16),
+                    label: const Text('Adicionar'),
+                  ),
+                ],
               ),
-              const SizedBox(height: 4),
               const Text(
-                'Confirme os medicamentos que deseja buscar:',
+                'Confirme os que deseja buscar:',
                 style: TextStyle(color: AppTheme.textGrey),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 10),
 
               ..._medicines.asMap().entries.map((entry) {
                 final med = entry.value;
@@ -301,21 +370,29 @@ Se não encontrar medicamentos, retorne apenas: NENHUM'''
                     onChanged: (v) => setState(
                         () => _medicines[entry.key].confirmed = v ?? true),
                     title: Text(med.name,
-                        style: const TextStyle(
-                            fontWeight: FontWeight.w500)),
-                    secondary: CircleAvatar(
-                      backgroundColor:
-                          AppTheme.primaryGreen.withValues(alpha: 0.1),
-                      child: const Icon(Icons.medication,
-                          color: AppTheme.primaryGreen, size: 20),
+                        style: const TextStyle(fontWeight: FontWeight.w500)),
+                    secondary: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        CircleAvatar(
+                          backgroundColor:
+                              AppTheme.primaryGreen.withValues(alpha: 0.1),
+                          child: const Icon(Icons.medication,
+                              color: AppTheme.primaryGreen, size: 20),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.delete_outline,
+                              color: Colors.red, size: 18),
+                          onPressed: () => setState(
+                              () => _medicines.removeAt(entry.key)),
+                        ),
+                      ],
                     ),
-                    activeColor: AppTheme.primaryGreen,
-                    checkColor: Colors.white,
                   ),
                 );
               }),
 
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
 
               // Aviso médico
               Container(
@@ -326,14 +403,12 @@ Se não encontrar medicamentos, retorne apenas: NENHUM'''
                 ),
                 child: const Row(
                   children: [
-                    Icon(Icons.info_outline,
-                        color: Colors.blue, size: 16),
+                    Icon(Icons.info_outline, color: Colors.blue, size: 16),
                     SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        'Sempre confirme os medicamentos com seu médico ou farmacêutico antes de comprar.',
-                        style:
-                            TextStyle(color: Colors.blue, fontSize: 12),
+                        'Confirme os medicamentos com seu médico antes de comprar.',
+                        style: TextStyle(color: Colors.blue, fontSize: 12),
                       ),
                     ),
                   ],
@@ -347,6 +422,42 @@ Se não encontrar medicamentos, retorne apenas: NENHUM'''
                     : null,
                 icon: const Icon(Icons.local_pharmacy_outlined),
                 label: const Text('Buscar nas farmácias'),
+              ),
+            ],
+
+            // Adicionar manualmente quando não encontrou nada
+            if (_medicines.isEmpty && !_isAnalyzing && _imageFile != null) ...[
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                onPressed: _addManual,
+                icon: const Icon(Icons.add),
+                label: const Text('Adicionar medicamento manualmente'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppTheme.primaryGreen,
+                  side: const BorderSide(color: AppTheme.primaryGreen),
+                  minimumSize: const Size(0, 50),
+                ),
+              ),
+            ],
+
+            // Texto bruto lido (debug/fallback)
+            if (_rawText.isNotEmpty && _medicines.isEmpty) ...[
+              const SizedBox(height: 16),
+              ExpansionTile(
+                title: const Text('Texto lido da receita',
+                    style: TextStyle(color: AppTheme.textGrey, fontSize: 13)),
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade100,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(_rawText,
+                        style: const TextStyle(fontSize: 12)),
+                  ),
+                ],
               ),
             ],
           ],
