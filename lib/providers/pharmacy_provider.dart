@@ -18,10 +18,11 @@ class PharmacyNotifier extends Notifier<List<PharmacyModel>> {
       final snapshot = await _firestore
           .collection('pharmacies')
           .where('isApproved', isEqualTo: true)
-          .where('isActive',   isEqualTo: true)
           .get();
 
-      state = snapshot.docs.map((doc) {
+      state = snapshot.docs
+          .where((doc) => doc.data()['isActive'] == true)
+          .map((doc) {
         final data = doc.data();
         return PharmacyModel(
           id:           doc.id,
