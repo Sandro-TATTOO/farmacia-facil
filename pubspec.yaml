@@ -25,6 +25,7 @@ dependencies:
   url_launcher: ^6.3.2
   google_generative_ai: ^0.4.7
   image_picker: ^1.2.3
+  http: ^1.6.0
 
 dev_dependencies:
   flutter_test:

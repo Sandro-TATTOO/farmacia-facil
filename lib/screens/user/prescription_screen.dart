@@ -1,13 +1,12 @@
 import 'dart:typed_data';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:google_generative_ai/google_generative_ai.dart';
+import 'package:http/http.dart' as http;
 import '../../app/theme.dart';
 
-// A chave é carregada via variável de ambiente ou string.fromEnvironment
-// Para desenvolvimento local use: flutter run --dart-define=GEMINI_API_KEY=sua_chave
 const _geminiApiKey = String.fromEnvironment(
   'GEMINI_API_KEY',
   defaultValue: '',
@@ -57,30 +56,57 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
     setState(() { _isAnalyzing = true; _errorMessage = null; });
 
     try {
-      final model = GenerativeModel(
-        model:  'gemini-1.5-flash',
-        apiKey: _geminiApiKey,
+      if (_geminiApiKey.isEmpty) {
+        setState(() {
+          _errorMessage = 'Chave da API não configurada.';
+          _isAnalyzing  = false;
+        });
+        return;
+      }
+
+      final base64Image = base64Encode(bytes);
+
+      final url = Uri.parse(
+        'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$_geminiApiKey',
       );
 
-      final prompt = '''
-Analise esta receita médica e extraia APENAS os nomes dos medicamentos prescritos.
+      final body = jsonEncode({
+        'contents': [
+          {
+            'parts': [
+              {
+                'text': '''Analise esta receita médica e extraia APENAS os nomes dos medicamentos prescritos.
 Retorne uma lista simples, um medicamento por linha, apenas o nome comercial ou genérico.
-Não inclua dosagens, quantidades ou instruções — apenas os nomes dos medicamentos.
-Se não encontrar medicamentos, retorne apenas: NENHUM
-Exemplo de resposta esperada:
-Amoxicilina
-Ibuprofeno
-Paracetamol
-''';
+Não inclua dosagens, quantidades ou instruções — apenas os nomes.
+Se não encontrar medicamentos, retorne apenas: NENHUM'''
+              },
+              {
+                'inline_data': {
+                  'mime_type': 'image/jpeg',
+                  'data': base64Image,
+                }
+              }
+            ]
+          }
+        ]
+      });
 
-      final response = await model.generateContent([
-        Content.multi([
-          TextPart(prompt),
-          DataPart('image/jpeg', bytes),
-        ]),
-      ]);
+      final response = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: body,
+      ).timeout(const Duration(seconds: 30));
 
-      final text = response.text ?? '';
+      if (response.statusCode != 200) {
+        setState(() {
+          _errorMessage = 'Erro na API (${response.statusCode}). Tente novamente.';
+          _isAnalyzing  = false;
+        });
+        return;
+      }
+
+      final data = jsonDecode(response.body);
+      final text = data['candidates']?[0]?['content']?['parts']?[0]?['text'] as String? ?? '';
 
       if (text.trim().toUpperCase().contains('NENHUM') || text.trim().isEmpty) {
         setState(() {
@@ -91,13 +117,12 @@ Paracetamol
         return;
       }
 
-      // Converte a resposta em lista de medicamentos
       final lines = text
           .split('\n')
           .map((l) => l.trim())
-          .where((l) => l.isNotEmpty && !l.startsWith('*') && !l.startsWith('-'))
-          .map((l) => l.replaceAll(RegExp(r'^[\d\.\-\*]+\s*'), '').trim())
           .where((l) => l.isNotEmpty)
+          .map((l) => l.replaceAll(RegExp(r'^[\d\.\-\*\•]+\s*'), '').trim())
+          .where((l) => l.isNotEmpty && l.length > 2)
           .toList();
 
       setState(() {
@@ -107,7 +132,7 @@ Paracetamol
 
     } catch (e) {
       setState(() {
-        _errorMessage = 'Erro ao analisar a imagem. Verifique sua conexão.';
+        _errorMessage = 'Erro ao analisar a imagem: ${e.toString().substring(0, 50)}';
         _isAnalyzing  = false;
       });
     }
