@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../providers/pharmacy_provider.dart';
 import '../../models/pharmacy_model.dart';
 import '../../app/theme.dart';
+import 'pharmacy_products_screen.dart';
 
 class PharmaciesScreen extends ConsumerWidget {
   const PharmaciesScreen({super.key});
@@ -162,22 +164,33 @@ class _PharmacyCard extends StatelessWidget {
               children: [
                 Expanded(
                   child: OutlinedButton.icon(
-                    onPressed: () {},
+                    onPressed: () async {
+                      final uri = Uri(
+                          scheme: 'tel',
+                          path: pharmacy.phone.replaceAll(RegExp(r'\D'), ''));
+                      if (await canLaunchUrl(uri)) {
+                        await launchUrl(uri);
+                      }
+                    },
                     icon: const Icon(Icons.phone_outlined, size: 16),
                     label: const Text('Ligar'),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: AppTheme.primaryGreen,
-                      side: const BorderSide(
-                          color: AppTheme.primaryGreen),
+                      side: const BorderSide(color: AppTheme.primaryGreen),
                     ),
                   ),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: ElevatedButton.icon(
-                    onPressed: () {},
-                    icon: const Icon(Icons.shopping_bag_outlined,
-                        size: 16),
+                    onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            PharmacyProductsScreen(pharmacy: pharmacy),
+                      ),
+                    ),
+                    icon: const Icon(Icons.shopping_bag_outlined, size: 16),
                     label: const Text('Fazer pedido'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppTheme.primaryGreen,
