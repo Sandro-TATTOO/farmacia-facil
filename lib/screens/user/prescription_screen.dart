@@ -66,8 +66,9 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
 
       final base64Image = base64Encode(bytes);
 
+      // Endpoint correto para chaves AQ. (novo formato Google AI Studio)
       final url = Uri.parse(
-        'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$_geminiApiKey',
+        'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent',
       );
 
       final body = jsonEncode({
@@ -91,9 +92,13 @@ Se não encontrar medicamentos, retorne apenas: NENHUM'''
         ]
       });
 
+      // Chaves AQ. usam header x-goog-api-key em vez de query param
       final response = await http.post(
         url,
-        headers: {'Content-Type': 'application/json'},
+        headers: {
+          'Content-Type': 'application/json',
+          'x-goog-api-key': _geminiApiKey,
+        },
         body: body,
       ).timeout(const Duration(seconds: 30));
 
@@ -132,7 +137,7 @@ Se não encontrar medicamentos, retorne apenas: NENHUM'''
 
     } catch (e) {
       setState(() {
-        _errorMessage = 'Erro ao analisar a imagem: ${e.toString().substring(0, 50)}';
+        _errorMessage = 'Erro ao analisar a imagem. Verifique sua conexão.';
         _isAnalyzing  = false;
       });
     }
