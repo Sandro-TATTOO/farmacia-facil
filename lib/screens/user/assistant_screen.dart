@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import '../../providers/assistant_provider.dart';
 import '../../models/chat_message_model.dart';
 import '../../app/theme.dart';
@@ -17,6 +19,8 @@ class _AssistantScreenState extends ConsumerState<AssistantScreen> {
   final _controller  = TextEditingController();
   final _scrollCtrl  = ScrollController();
   final _focusNode   = FocusNode();
+  final _picker      = ImagePicker();
+  bool  _scanningPrescription = false;
 
   // Sugestões rápidas de perguntas
   static const _suggestions = [
@@ -54,6 +58,134 @@ class _AssistantScreenState extends ConsumerState<AssistantScreen> {
         );
       }
     });
+  }
+
+  // Abre câmera/galeria, lê a receita e envia para o assistente
+  Future<void> _scanPrescription(ImageSource source) async {
+    if (kIsWeb) {
+      ref.read(assistantProvider.notifier).sendMessage(
+        'Como funciona a leitura de receita no app?',
+      );
+      return;
+    }
+
+    try {
+      final picked = await _picker.pickImage(
+        source:       source,
+        maxWidth:     1200,
+        imageQuality: 90,
+      );
+      if (picked == null) return;
+
+      setState(() => _scanningPrescription = true);
+
+      // Envia mensagem de contexto para o chat
+      ref.read(assistantProvider.notifier).sendImageMessage(
+        '📷 Analisando receita médica...',
+      );
+
+      // OCR com ML Kit
+      final inputImage  = InputImage.fromFilePath(picked.path);
+      final recognizer  = TextRecognizer(script: TextRecognitionScript.latin);
+      final recognized  = await recognizer.processImage(inputImage);
+      await recognizer.close();
+
+      final text = recognized.text.trim();
+
+      if (text.isEmpty) {
+        ref.read(assistantProvider.notifier).sendMessage(
+          'Fotografei uma receita mas o texto não ficou legível. '
+          'Pode tentar novamente com mais luz?',
+        );
+      } else {
+        // Envia o texto para o assistente analisar
+        ref.read(assistantProvider.notifier).sendMessage(
+          'Acabei de fotografar uma receita médica. '
+          'Aqui está o texto lido:\n\n$text\n\n'
+          'Quais medicamentos você consegue identificar nessa receita? '
+          'Me ajude a confirmar e sugira onde comprar.',
+        );
+      }
+
+      _scrollToBottom();
+    } catch (e) {
+      ref.read(assistantProvider.notifier).sendMessage(
+        'Tive um problema ao acessar a câmera. Tente novamente.',
+      );
+    } finally {
+      setState(() => _scanningPrescription = false);
+    }
+  }
+
+  void _showImageSourceDialog() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40, height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 20),
+              const Text(
+                'Ler receita médica',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 6),
+              const Text(
+                'Escolha como enviar a receita',
+                style: TextStyle(color: AppTheme.textGrey),
+              ),
+              const SizedBox(height: 20),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primaryGreen.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.camera_alt,
+                      color: AppTheme.primaryGreen),
+                ),
+                title: const Text('Tirar foto agora'),
+                subtitle: const Text('Abre a câmera do celular'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _scanPrescription(ImageSource.camera);
+                },
+              ),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.photo_library, color: Colors.blue),
+                ),
+                title: const Text('Escolher da galeria'),
+                subtitle: const Text('Seleciona uma foto existente'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _scanPrescription(ImageSource.gallery);
+                },
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -174,8 +306,9 @@ class _AssistantScreenState extends ConsumerState<AssistantScreen> {
           _InputBar(
             controller: _controller,
             focusNode: _focusNode,
-            isLoading: state.isLoading,
+            isLoading: state.isLoading || _scanningPrescription,
             onSend: _send,
+            onCamera: _showImageSourceDialog,
           ),
         ],
       ),
@@ -410,18 +543,20 @@ class _InputBar extends StatelessWidget {
   final FocusNode            focusNode;
   final bool                 isLoading;
   final VoidCallback         onSend;
+  final VoidCallback         onCamera;
 
   const _InputBar({
     required this.controller,
     required this.focusNode,
     required this.isLoading,
     required this.onSend,
+    required this.onCamera,
   });
 
   @override
   Widget build(BuildContext context) => Container(
         padding: EdgeInsets.only(
-          left: 16,
+          left: 8,
           right: 8,
           top: 8,
           bottom: 8 + MediaQuery.of(context).viewInsets.bottom,
@@ -438,6 +573,15 @@ class _InputBar extends StatelessWidget {
         ),
         child: Row(
           children: [
+            // Botão câmera
+            if (!kIsWeb)
+              IconButton(
+                onPressed: isLoading ? null : onCamera,
+                icon: const Icon(Icons.camera_alt_outlined),
+                color: AppTheme.primaryGreen,
+                tooltip: 'Ler receita',
+              ),
+            // Campo de texto
             Expanded(
               child: TextField(
                 controller: controller,
@@ -445,7 +589,7 @@ class _InputBar extends StatelessWidget {
                 maxLines:   null,
                 textCapitalization: TextCapitalization.sentences,
                 decoration: InputDecoration(
-                  hintText:    'Digite sua pergunta...',
+                  hintText:    'Digite ou use a câmera...',
                   filled:      true,
                   fillColor:   Colors.grey.shade100,
                   border: OutlineInputBorder(
@@ -459,42 +603,36 @@ class _InputBar extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 8),
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              child: isLoading
-                  ? Container(
-                      width: 44,
-                      height: 44,
-                      decoration: BoxDecoration(
-                        color: AppTheme.primaryGreen
-                            .withValues(alpha: 0.15),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Center(
-                        child: SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: AppTheme.primaryGreen,
-                          ),
-                        ),
-                      ),
-                    )
-                  : Material(
-                      color: AppTheme.primaryGreen,
-                      shape: const CircleBorder(),
-                      child: InkWell(
-                        onTap:         onSend,
-                        customBorder:  const CircleBorder(),
-                        child: const Padding(
-                          padding: EdgeInsets.all(10),
-                          child: Icon(Icons.send,
-                              color: Colors.white, size: 22),
+            // Botão enviar
+            isLoading
+                ? Container(
+                    width: 44, height: 44,
+                    decoration: BoxDecoration(
+                      color: AppTheme.primaryGreen.withValues(alpha: 0.15),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Center(
+                      child: SizedBox(
+                        width: 20, height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: AppTheme.primaryGreen,
                         ),
                       ),
                     ),
-            ),
+                  )
+                : Material(
+                    color:        AppTheme.primaryGreen,
+                    shape:        const CircleBorder(),
+                    child: InkWell(
+                      onTap:        onSend,
+                      customBorder: const CircleBorder(),
+                      child: const Padding(
+                        padding: EdgeInsets.all(10),
+                        child: Icon(Icons.send, color: Colors.white, size: 22),
+                      ),
+                    ),
+                  ),
           ],
         ),
       );

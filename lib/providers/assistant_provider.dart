@@ -109,6 +109,18 @@ class AssistantNotifier extends Notifier<AssistantState> {
     }
   }
 
+  // ── Envia mensagem do sistema sem aguardar IA (para contexto de câmera) ───
+  void sendImageMessage(String text) {
+    final msg = ChatMessage(
+      id:        's${DateTime.now().millisecondsSinceEpoch}',
+      text:      text,
+      role:      MessageRole.assistant,
+      createdAt: DateTime.now(),
+      isLoading: true,
+    );
+    state = state.copyWith(messages: [...state.messages, msg]);
+  }
+
   // ── Envia mensagem ─────────────────────────────────────────────────────────
   Future<void> sendMessage(String text) async {
     if (text.trim().isEmpty || state.isLoading) return;
@@ -144,7 +156,7 @@ class AssistantNotifier extends Notifier<AssistantState> {
       // Chama a IA
       final response = await _callGemini(text.trim(), context);
 
-      final updated = state.messages.where((m) => m.id != 'loading').toList();
+      final updated = state.messages.where((m) => m.id != 'loading' && !m.isLoading).toList();
       final assistantMsg = ChatMessage(
         id:        'a${DateTime.now().millisecondsSinceEpoch}',
         text:      response,
@@ -161,7 +173,7 @@ class AssistantNotifier extends Notifier<AssistantState> {
       await _speak(response);
 
     } catch (e) {
-      final updated = state.messages.where((m) => m.id != 'loading').toList();
+      final updated = state.messages.where((m) => m.id != 'loading' && !m.isLoading).toList();
       state = state.copyWith(
         messages: [...updated, ChatMessage(
           id:        'err${DateTime.now().millisecondsSinceEpoch}',
