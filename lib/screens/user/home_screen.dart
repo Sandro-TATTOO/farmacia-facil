@@ -167,6 +167,18 @@ class HomeScreen extends ConsumerWidget {
                       onTap: () => context.go('/pharmacies'),
                     ),
                     _ActionCard(
+                      icon: Icons.document_scanner_outlined,
+                      label: 'Ler\nReceita',
+                      color: Colors.teal,
+                      onTap: () => context.go('/prescription'),
+                    ),
+                    _ActionCard(
+                      icon: Icons.receipt_long_outlined,
+                      label: 'Meus\nPedidos',
+                      color: Colors.indigo,
+                      onTap: () => context.go('/orders'),
+                    ),
+                    _ActionCard(
                       icon: Icons.alarm_outlined,
                       label: 'Meus\nLembretes',
                       color: Colors.orange,
