@@ -11,10 +11,11 @@ class MainShell extends StatelessWidget {
     if (loc.startsWith('/home'))         return 0;
     if (loc.startsWith('/medications'))  return 1;
     if (loc.startsWith('/pharmacies'))   return 2;
-    if (loc.startsWith('/prescription')) return 3;
-    if (loc.startsWith('/orders'))       return 4;
-    if (loc.startsWith('/health-tips'))  return 5;
-    if (loc.startsWith('/profile'))      return 6;
+    if (loc.startsWith('/assistant'))    return 3;
+    if (loc.startsWith('/prescription')) return 4;
+    if (loc.startsWith('/orders'))       return 5;
+    if (loc.startsWith('/health-tips'))  return 6;
+    if (loc.startsWith('/profile'))      return 7;
     return 0;
   }
 
@@ -28,15 +29,17 @@ class MainShell extends StatelessWidget {
         selectedIndex: currentIndex,
         backgroundColor: Colors.white,
         indicatorColor: AppTheme.accentGreen.withValues(alpha: 0.3),
+        labelBehavior: NavigationDestinationLabelBehavior.onlyShowSelected,
         onDestinationSelected: (index) {
           switch (index) {
             case 0: context.go('/home');         break;
             case 1: context.go('/medications');  break;
             case 2: context.go('/pharmacies');   break;
-            case 3: context.go('/prescription'); break;
-            case 4: context.go('/orders');       break;
-            case 5: context.go('/health-tips');  break;
-            case 6: context.go('/profile');      break;
+            case 3: context.go('/assistant');    break;
+            case 4: context.go('/prescription'); break;
+            case 5: context.go('/orders');       break;
+            case 6: context.go('/health-tips');  break;
+            case 7: context.go('/profile');      break;
           }
         },
         destinations: const [
@@ -54,6 +57,11 @@ class MainShell extends StatelessWidget {
             icon:         Icon(Icons.local_pharmacy_outlined),
             selectedIcon: Icon(Icons.local_pharmacy),
             label:        'Farmácias',
+          ),
+          NavigationDestination(
+            icon:         Icon(Icons.smart_toy_outlined),
+            selectedIcon: Icon(Icons.smart_toy),
+            label:        'Assistente',
           ),
           NavigationDestination(
             icon:         Icon(Icons.document_scanner_outlined),

@@ -9,6 +9,7 @@ import '../screens/user/health_tips_screen.dart';
 import '../screens/user/profile_screen.dart';
 import '../screens/user/orders_screen.dart';
 import '../screens/user/prescription_screen.dart';
+import '../screens/user/assistant_screen.dart';
 import '../screens/shared/main_shell.dart';
 
 final GoRouter appRouter = GoRouter(
@@ -52,6 +53,10 @@ final GoRouter appRouter = GoRouter(
         GoRoute(
           path: '/health-tips',
           builder: (context, state) => const HealthTipsScreen(),
+        ),
+        GoRoute(
+          path: '/assistant',
+          builder: (context, state) => const AssistantScreen(),
         ),
         GoRoute(
           path: '/profile',
