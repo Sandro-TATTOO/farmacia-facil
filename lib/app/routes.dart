@@ -7,6 +7,7 @@ import '../screens/user/medications_screen.dart';
 import '../screens/user/pharmacies_screen.dart';
 import '../screens/user/health_tips_screen.dart';
 import '../screens/user/profile_screen.dart';
+import '../screens/user/orders_screen.dart';
 import '../screens/shared/main_shell.dart';
 
 // Router simples — a splash cuida do redirecionamento inicial
@@ -48,6 +49,10 @@ final GoRouter appRouter = GoRouter(
         GoRoute(
           path: '/profile',
           builder: (context, state) => const ProfileScreen(),
+        ),
+        GoRoute(
+          path: '/orders',
+          builder: (context, state) => const OrdersScreen(),
         ),
       ],
     ),
