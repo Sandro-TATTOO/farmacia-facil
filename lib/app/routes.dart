@@ -8,10 +8,9 @@ import '../screens/user/pharmacies_screen.dart';
 import '../screens/user/health_tips_screen.dart';
 import '../screens/user/profile_screen.dart';
 import '../screens/user/orders_screen.dart';
+import '../screens/user/prescription_screen.dart';
 import '../screens/shared/main_shell.dart';
 
-// Router simples — a splash cuida do redirecionamento inicial
-// e cada tela cuida da sua própria proteção
 final GoRouter appRouter = GoRouter(
   initialLocation: '/splash',
   routes: [
@@ -43,16 +42,20 @@ final GoRouter appRouter = GoRouter(
           builder: (context, state) => const PharmaciesScreen(),
         ),
         GoRoute(
+          path: '/prescription',
+          builder: (context, state) => const PrescriptionScreen(),
+        ),
+        GoRoute(
+          path: '/orders',
+          builder: (context, state) => const OrdersScreen(),
+        ),
+        GoRoute(
           path: '/health-tips',
           builder: (context, state) => const HealthTipsScreen(),
         ),
         GoRoute(
           path: '/profile',
           builder: (context, state) => const ProfileScreen(),
-        ),
-        GoRoute(
-          path: '/orders',
-          builder: (context, state) => const OrdersScreen(),
         ),
       ],
     ),

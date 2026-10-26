@@ -23,6 +23,8 @@ dependencies:
   firebase_auth: ^7.0.1
   cloud_firestore: ^7.1.0
   url_launcher: ^6.3.2
+  google_generative_ai: ^0.4.7
+  image_picker: ^1.2.3
 
 dev_dependencies:
   flutter_test:

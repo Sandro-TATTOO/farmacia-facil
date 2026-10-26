@@ -1,241 +1,264 @@
 ================================================================
-  FARMÁCIA FÁCIL — RELATÓRIO DE DESENVOLVIMENTO
+  FARMÁCIA FÁCIL — RELATÓRIO COMPLETO DE DESENVOLVIMENTO
   Atualizado: Outubro 2026
 ================================================================
 
 ----------------------------------------------------------------
-1. AMBIENTE DE DESENVOLVIMENTO
+1. VISÃO GERAL DO ECOSSISTEMA
 ----------------------------------------------------------------
 
-Sistema Operacional : Windows 10 Home 64-bit
-Flutter             : 3.38.5 (canal stable)
-Dart                : 3.10.4
-Android SDK         : 36.1.0
-Git                 : 2.54.0
-Editor              : Kiro IDE
-Licenças Android    : Aceitas e configuradas
-Chrome              : Disponível para testes Web
-Visual Studio 2026  : Instalado
+O projeto Farmácia Fácil é composto por 4 aplicativos separados:
 
-Status do ambiente  : 100% configurado e funcional
+  APP 1 — Usuário (farmacia.facio)        ← EM DESENVOLVIMENTO
+  APP 2 — Vendedor (farmacia-facil-vendedor) ← EM CONSTRUÇÃO
+  APP 3 — Entregador                      ← PLANEJADO (Fase 3)
+  APP 4 — Admin                           ← PLANEJADO (Fase 4)
+
+Todos os apps compartilham o mesmo Firebase (banco de dados,
+autenticação e armazenamento na nuvem).
 
 
 ----------------------------------------------------------------
-2. PROJETO
+2. APP 1 — USUÁRIO
 ----------------------------------------------------------------
 
-Nome do app         : Farmácia Fácil
-Pasta local         : C:\Users\YYYY\Documents\farmacia.facio
-Repositório GitHub  : https://github.com/Sandro-TATTOO/farmacia-facil
-Branch principal    : main
-Plataformas alvo    : Android + Web
+Pasta local  : C:\Users\YYYY\Documents\farmacia.facio
+Repositório  : https://github.com/Sandro-TATTOO/farmacia-facil
+Link online  : https://sandro-tattoo.github.io/farmacia-facil/
+Tag de backup: v1.0-fase1
 
+HISTÓRICO DE COMMITS:
+  ea2a6b8  Simplificar router e corrigir navegacao
+  cf548ab  Corrigir erro de tipo no router - pagina em branco
+  3d37fab  Corrigir navegacao apos login
+  1e5ac31  Atualizar relatorio de desenvolvimento
+  593f5d0  Atualizar gitignore
+  1229475  Corrigir login e cadastro com Firebase
+  cfbacca  Migracao para Firebase Auth e Firestore
+  035835f  Disparar deploy GitHub Pages
+  49bae79  Adicionar deploy automatico GitHub Pages
+  49520c6  Primeiro commit - Farmacia Facil
 
-----------------------------------------------------------------
-3. PUBLICAÇÃO WEB
-----------------------------------------------------------------
-
-  [OK] App publicado e acessível publicamente na internet
-  [OK] GitHub Actions configurado (deploy automático)
-  [OK] GitHub Pages ativado
-  [OK] Domínio do GitHub Pages autorizado no Firebase
-
-  Link público do app:
-  https://sandro-tattoo.github.io/farmacia-facil/
-
-  Como funciona o deploy automático:
-  - Toda vez que fizer git push para o branch main
-  - O GitHub Actions compila o Flutter automaticamente
-  - E publica a nova versão no link acima em 3-5 minutos
-
-  Acompanhar deploys:
-  https://github.com/Sandro-TATTOO/farmacia-facil/actions
-
-
-----------------------------------------------------------------
-4. FIREBASE — CONFIGURAÇÃO
-----------------------------------------------------------------
-
-  Projeto Firebase    : farmacia-facil-b980c
-  Console             : https://console.firebase.google.com
-  Plano               : Spark (gratuito)
-
-  Serviços configurados:
-  [OK] Firebase Authentication — E-mail/senha ativado
-  [OK] Cloud Firestore — Banco criado (nam5, modo teste)
-  [OK] Domínio GitHub Pages autorizado no Authentication
-
-  Coleções do Firestore:
-  - users/          Dados dos usuários (nome, e-mail, tel, endereço)
-  - users/{id}/medications/   Remédios de cada usuário
-
-
-----------------------------------------------------------------
-5. DEPENDÊNCIAS INSTALADAS
-----------------------------------------------------------------
-
-  flutter_riverpod        : Gerenciamento de estado
-  go_router               : Navegação entre telas
-  shared_preferences      : Armazenamento local (legado)
-  google_fonts            : Fontes (instalado, não usado ainda)
-  flutter_local_noti.     : Notificações (instalado, Fase 2)
-  intl                    : Formatação de datas (instalado, Fase 2)
-  firebase_core           : Base do Firebase
-  firebase_auth           : Autenticação Firebase
-  cloud_firestore         : Banco de dados na nuvem
-
-
-----------------------------------------------------------------
-6. ESTRUTURA DE ARQUIVOS
-----------------------------------------------------------------
-
-lib/
-├── main.dart                        Ponto de entrada do app
-├── firebase_options.dart            Configurações do Firebase
-├── app/
-│   ├── theme.dart                   Cores e estilo visual
-│   └── routes.dart                  Navegação + proteção de rotas
-├── models/
-│   ├── user_model.dart              Dados do usuário
-│   ├── medication_model.dart        Dados dos remédios
-│   ├── pharmacy_model.dart          Dados das farmácias
-│   └── health_tip_model.dart        Dados das dicas de saúde
-├── providers/
-│   ├── auth_provider.dart           Login, cadastro, sessão (Firebase)
-│   └── medication_provider.dart     Remédios (Firestore)
-├── screens/
-│   ├── auth/
-│   │   ├── splash_screen.dart       Tela inicial animada
-│   │   ├── login_screen.dart        Tela de login
-│   │   └── register_screen.dart     Tela de cadastro
-│   ├── user/
-│   │   ├── home_screen.dart         Tela principal
-│   │   ├── medications_screen.dart  Gerenciamento de remédios
-│   │   ├── pharmacies_screen.dart   Lista de farmácias
-│   │   ├── health_tips_screen.dart  Dicas de saúde
-│   │   └── profile_screen.dart      Perfil do usuário
-│   └── shared/
-│       └── main_shell.dart          Barra de navegação inferior
-└── assets/
-    ├── images/
-    └── icons/
-
-.github/
-└── workflows/
-    └── deploy.yml                   Deploy automático GitHub Pages
-
-
-----------------------------------------------------------------
-7. FUNCIONALIDADES — STATUS ATUAL
-----------------------------------------------------------------
-
-AUTENTICAÇÃO (Firebase)
-  [OK] Tela de splash com animação
+FUNCIONALIDADES CONCLUÍDAS:
+  [OK] Splash screen com animação
   [OK] Cadastro com Firebase Authentication
   [OK] Login com Firebase Authentication
-  [OK] Senhas gerenciadas pelo Firebase (criptografadas)
-  [OK] Sessão mantida entre visitas (qualquer dispositivo)
+  [OK] Sessão mantida entre visitas
   [OK] Logout
-  [OK] Proteção de rotas (usuário não logado vai para login)
-  [OK] Redirecionamento automático após login/cadastro
-  [OK] Mensagens de erro em português
-
-BANCO DE DADOS (Firestore)
-  [OK] Dados do usuário salvos na nuvem
-  [OK] Remédios vinculados ao usuário logado
-  [OK] Adicionar remédio salva no Firestore
-  [OK] Registrar dose atualiza no Firestore
-  [OK] Remover remédio deleta do Firestore
-  [OK] Dados isolados por usuário
-
-TELAS
-  [OK] Home com resumo e ações rápidas
-  [OK] Remédios — adicionar, registrar dose, remover
+  [OK] Dados do usuário salvos no Firestore
+  [OK] Tela Home com resumo e ações rápidas
+  [OK] Adicionar remédio com horários e duração
+  [OK] Registrar dose tomada
   [OK] Alerta de estoque baixo
-  [OK] Farmácias — lista com dados de exemplo
+  [OK] Remover remédio
+  [OK] Dados dos remédios no Firestore por usuário
+  [OK] Lista de farmácias (dados de exemplo)
   [OK] Dicas de saúde com categorias
-  [OK] Perfil com dados do usuário
-
-INFRAESTRUTURA
-  [OK] Repositório GitHub configurado
+  [OK] Perfil do usuário
   [OK] Deploy automático via GitHub Actions
   [OK] App publicado no GitHub Pages
-  [OK] Firebase inicializado e conectado
 
-
-----------------------------------------------------------------
-8. O QUE AINDA NÃO FOI DESENVOLVIDO (PRÓXIMAS FASES)
-----------------------------------------------------------------
-
-MELHORIAS IMEDIATAS
+PENDENTE NO APP USUÁRIO:
   [ ] Notificações nos horários dos remédios
-  [ ] Busca e filtros reais de farmácias
-  [ ] Editar perfil do usuário
-  [ ] Tela de edição de remédio
-
-FASE 2 — Pedidos
-  [ ] Sistema de pedidos dentro do app
-  [ ] Endereço temporário além do fixo
-  [ ] Confirmação pela farmácia
-  [ ] Painel da farmácia
-
-FASE 3 — Recursos Inteligentes
-  [ ] OCR de receitas (câmera → identificar remédios)
-  [ ] Google Maps real (farmácias por localização)
+  [ ] Busca real de farmácias por localização
+  [ ] Sistema de pedidos (integração com app vendedor)
+  [ ] Editar perfil
   [ ] Alerta de reposição automático
-  [ ] Painel do entregador
 
-MELHORIAS VISUAIS
-  [ ] Ícone personalizado do app
-  [ ] Logo real na splash screen
-  [ ] Tela de onboarding para novos usuários
-
-
-----------------------------------------------------------------
-9. COMO RODAR O PROJETO LOCALMENTE
-----------------------------------------------------------------
-
-  Rodar no Chrome:
-    flutter run -d chrome
-
-  Rodar no Android:
-    flutter run -d android
-
-  Enviar atualizações para o GitHub (deploy automático):
-    git add .
-    git commit -m "Descrição da mudança"
-    git push origin main
+PROBLEMA EM ABERTO:
+  - Após login, às vezes fica carregando ou volta para login
+    (problema intermitente de navegação no Flutter Web)
+  - Em investigação — pode ser cache do navegador
 
 
 ----------------------------------------------------------------
-10. SEGURANÇA
+3. APP 2 — VENDEDOR (EM CONSTRUÇÃO)
 ----------------------------------------------------------------
 
-  [OK] Senhas gerenciadas pelo Firebase (não ficam no app)
-  [OK] Dados de cada usuário isolados no Firestore
-  [OK] Proteção de rotas implementada
-  [OK] Domínio autorizado no Firebase
+Pasta local  : C:\Users\YYYY\Documents\farmacia-facil-vendedor
+Repositório  : A criar no GitHub
+Plataforma   : Web primeiro, Android depois
 
-  PENDENTE:
-  [ ] Regras de segurança do Firestore (modo teste expira em 30 dias)
-  [ ] Trocar token do GitHub quando entrar em produção
-  [ ] Configurar regras do Firestore antes de lançar
+ARQUIVOS CRIADOS ATÉ AGORA:
+  lib/main.dart                    (gerado pelo Flutter)
+  lib/app/theme.dart               Tema azul escuro do painel
+  lib/models/vendor_model.dart     Dados da farmácia/vendedor
+  lib/models/product_model.dart    Dados dos produtos
+  lib/models/order_model.dart      Dados dos pedidos
+  lib/providers/auth_provider.dart Login, cadastro, aprovação
+  lib/providers/orders_provider.dart Pedidos e status
+  lib/providers/products_provider.dart Produtos e estoque
+  lib/screens/auth/splash_screen.dart
+  lib/screens/auth/login_screen.dart
+  lib/screens/auth/register_screen.dart
+  lib/screens/auth/pending_screen.dart  (aguarda aprovação admin)
+  lib/screens/dashboard/dashboard_screen.dart
 
-  ATENÇÃO — Regras do Firestore:
-  O banco foi criado em "modo de teste" — qualquer pessoa
-  pode ler e escrever por 30 dias. Antes de lançar o app
-  para o público, é necessário configurar as regras de
-  segurança no Firebase Console.
+AINDA FALTA CRIAR:
+  lib/screens/orders/orders_screen.dart
+  lib/screens/orders/order_detail_screen.dart
+  lib/screens/products/products_screen.dart
+  lib/screens/products/add_product_screen.dart
+  lib/screens/pharmacy/pharmacy_screen.dart
+  lib/screens/shared/main_shell.dart
+  lib/app/routes.dart
+  lib/firebase_options.dart (gerado pelo FlutterFire CLI)
+
+FUNCIONALIDADES PLANEJADAS:
+  [OK] Modelo de dados completo (vendor, product, order)
+  [OK] Autenticação com Firebase
+  [OK] Cadastro com aprovação do admin
+  [OK] Tela de aguardando aprovação
+  [OK] Dashboard com resumo do dia
+  [ ] Tela de pedidos (listar, confirmar, atualizar status)
+  [ ] Tela de produtos (listar, adicionar, editar, estoque)
+  [ ] Tela de perfil da farmácia
+  [ ] Navegação completa (routes.dart + main_shell)
+  [ ] Conexão com Firebase (firebase_options.dart)
+  [ ] Deploy no GitHub Pages
+
+FLUXO DE APROVAÇÃO:
+  Vendedor cadastra → status isApproved = false
+  Admin vê no painel → aprova → isApproved = true
+  Vendedor acessa o dashboard normalmente
 
 
 ----------------------------------------------------------------
-11. OBSERVAÇÕES
+4. APP 3 — ENTREGADOR (PLANEJADO)
 ----------------------------------------------------------------
 
-  - O app é uma ferramenta de apoio informativo
-  - Não substitui orientação médica profissional
-  - Login e cadastro funcionam na nuvem via Firebase
-  - Dados acessíveis em qualquer dispositivo após login
+Pasta local  : A criar
+Plataforma   : Android (entregador usa celular)
+Status       : Fase 3 — não iniciado
+
+FUNCIONALIDADES PREVISTAS:
+  [ ] Login com código ou e-mail
+  [ ] Ver pedidos disponíveis para entrega
+  [ ] Confirmar retirada na farmácia
+  [ ] Confirmar entrega ao usuário
+  [ ] Histórico de entregas
+
+
+----------------------------------------------------------------
+5. APP 4 — ADMIN (PLANEJADO)
+----------------------------------------------------------------
+
+Pasta local  : A criar
+Plataforma   : Web
+Acesso       : Somente o dono do sistema
+Status       : Fase 4 — não iniciado
+
+FUNCIONALIDADES PREVISTAS:
+  [ ] Login com conta especial admin
+  [ ] Aprovar/reprovar farmácias cadastradas
+  [ ] Listar e gerenciar usuários
+  [ ] Listar e gerenciar farmácias
+  [ ] Listar e gerenciar entregadores
+  [ ] Dashboard geral do sistema
+  [ ] Relatórios e estatísticas
+
+
+----------------------------------------------------------------
+6. FIREBASE — CONFIGURAÇÃO ATUAL
+----------------------------------------------------------------
+
+Projeto     : farmacia-facil-b980c
+Console     : https://console.firebase.google.com
+Plano       : Spark (gratuito)
+
+Serviços ativos:
+  [OK] Firebase Authentication — E-mail/senha
+  [OK] Cloud Firestore — banco de dados na nuvem
+  [OK] Domínio GitHub Pages autorizado
+
+Estrutura do Firestore:
+  users/
+    {userId}/
+      name, email, phone, address, createdAt
+      medications/
+        {medicationId}/
+          name, dosage, times, remainingPills...
+
+  pharmacies/
+    {pharmacyId}/
+      name, ownerName, email, phone, address...
+      isApproved, isActive
+      products/
+        {productId}/
+          name, price, stock, category...
+
+  orders/
+    {orderId}/
+      userId, pharmacyId, status, items, totalPrice...
+
+ATENÇÃO:
+  O Firestore está em "modo de teste" — expira em 30 dias.
+  Antes de lançar, configurar as regras de segurança.
+
+
+----------------------------------------------------------------
+7. AMBIENTE DE DESENVOLVIMENTO
+----------------------------------------------------------------
+
+Sistema     : Windows 10 Home 64-bit
+Flutter     : 3.38.5 | Dart 3.10.4
+Editor      : Kiro IDE
+Git         : 2.54.0
+Android SDK : 36.1.0 (licenças aceitas)
+
+Ferramentas:
+  [OK] Flutter SDK configurado
+  [OK] Android Studio / SDK
+  [OK] Git configurado
+  [OK] Firebase CLI (em uso)
+  [OK] FlutterFire CLI (em uso)
+  [OK] GitHub Actions (deploy automático)
+
+
+----------------------------------------------------------------
+8. COMO RODAR OS PROJETOS
+----------------------------------------------------------------
+
+APP USUÁRIO:
+  cd C:\Users\YYYY\Documents\farmacia.facio
+  flutter run -d chrome
+
+APP VENDEDOR:
+  cd C:\Users\YYYY\Documents\farmacia-facil-vendedor
+  flutter run -d chrome
+
+ENVIAR ATUALIZAÇÕES PARA O GITHUB:
+  git add .
+  git commit -m "Descrição da mudança"
+  git push origin main
+  (deploy automático em 3-5 minutos)
+
+
+----------------------------------------------------------------
+9. PRÓXIMOS PASSOS (em ordem)
+----------------------------------------------------------------
+
+1. Concluir o app Vendedor
+   - Criar telas restantes (pedidos, produtos, farmácia)
+   - Configurar routes.dart e main_shell
+   - Conectar ao Firebase com FlutterFire CLI
+   - Criar repositório no GitHub e configurar deploy
+
+2. Configurar regras de segurança do Firestore
+   - Modo de teste expira em ~30 dias
+   - Definir quem pode ler/escrever cada coleção
+
+3. Integrar Usuário ↔ Vendedor
+   - Usuário faz pedido → aparece no app do vendedor
+   - Vendedor confirma → usuário vê status atualizado
+
+4. Corrigir problema de navegação no app Usuário
+   - Login às vezes não redireciona corretamente no web
+
+5. Criar app do Entregador (Fase 3)
+
+6. Criar painel Admin (Fase 4)
+
 
 ================================================================
   FIM DO RELATÓRIO
