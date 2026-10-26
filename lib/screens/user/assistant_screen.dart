@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../providers/assistant_provider.dart';
 import '../../models/chat_message_model.dart';
 import '../../app/theme.dart';
@@ -144,21 +145,27 @@ class _AssistantScreenState extends ConsumerState<AssistantScreen> {
               controller: _scrollCtrl,
               padding: const EdgeInsets.all(16),
               itemCount: state.messages.length +
-                  (state.messages.length == 1 ? 1 : 0),
+                  (state.messages.length == 1 ? 1 : 0) +
+                  (state.pendingActions.isNotEmpty ? 1 : 0),
               itemBuilder: (context, index) {
-                // Mostra sugestões após a mensagem de boas-vindas
+                // Sugestões após boas-vindas
                 if (state.messages.length == 1 && index == 1) {
                   return _SuggestionsWidget(
                     suggestions: _suggestions,
-                    onTap: (s) {
-                      ref
-                          .read(assistantProvider.notifier)
-                          .sendMessage(s);
-                    },
+                    onTap: (s) =>
+                        ref.read(assistantProvider.notifier).sendMessage(s),
                   );
                 }
-                return _MessageBubble(
-                    message: state.messages[index]);
+                // Botões de ação navegável
+                final actionsIndex = state.messages.length +
+                    (state.messages.length == 1 ? 1 : 0);
+                if (state.pendingActions.isNotEmpty && index == actionsIndex) {
+                  return _ActionsWidget(
+                    actions: state.pendingActions,
+                    onTap: (route) => context.go(route),
+                  );
+                }
+                return _MessageBubble(message: state.messages[index]);
               },
             ),
           ),
@@ -312,6 +319,36 @@ class _Dot extends StatelessWidget {
         decoration: const BoxDecoration(
           color: AppTheme.textGrey,
           shape: BoxShape.circle,
+        ),
+      );
+}
+
+// ─── Botões de ação navegável ────────────────────────────────────────────────
+class _ActionsWidget extends StatelessWidget {
+  final List<AssistantAction>  actions;
+  final void Function(String)  onTap;
+
+  const _ActionsWidget({required this.actions, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.only(bottom: 12, left: 40),
+        child: Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: actions.map((a) => ElevatedButton.icon(
+            onPressed: () => onTap(a.route),
+            icon: Text(a.icon, style: const TextStyle(fontSize: 14)),
+            label: Text(a.label, style: const TextStyle(fontSize: 12)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primaryGreen,
+              foregroundColor: Colors.white,
+              minimumSize: Size.zero,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20)),
+            ),
+          )).toList(),
         ),
       );
 }
