@@ -1,5 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../app/theme.dart';
+
+// Abre o discador com o número informado
+Future<void> _makeCall(String number) async {
+  final clean = number.replaceAll(RegExp(r'[\s\-\(\)]'), '');
+  final uri   = Uri.parse('tel:$clean');
+  if (await canLaunchUrl(uri)) {
+    await launchUrl(uri);
+  }
+}
 
 class HealthTipsScreen extends StatelessWidget {
   const HealthTipsScreen({super.key});
@@ -647,7 +657,7 @@ class _FirstAidCard extends StatelessWidget {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
-                  onPressed: () {},
+                  onPressed: () => _makeCall(phone),
                   icon: const Icon(Icons.phone),
                   label: Text('Ligar $phone'),
                   style: ElevatedButton.styleFrom(
@@ -735,7 +745,7 @@ class _EmergencyNumbers extends StatelessWidget {
                       style: const TextStyle(color: Colors.white,
                           fontWeight: FontWeight.bold, fontSize: 13)),
                 ),
-                onTap: () {},
+                onTap: () => _makeCall(n['number'] as String),
               ),
             );
           }),
