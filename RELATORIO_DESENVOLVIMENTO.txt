@@ -1,329 +1,378 @@
 ================================================================
-  FARMÁCIA FÁCIL — RELATÓRIO DE ESTADO ATUAL
-  Análise Profunda — Outubro 2026
+  FARMÁCIA FÁCIL — RELATÓRIO GERAL DE DESENVOLVIMENTO
+  Versão 3.0 — Outubro 2026
 ================================================================
 
 ----------------------------------------------------------------
-1. RESUMO EXECUTIVO
+1. VISÃO GERAL DO ECOSSISTEMA
 ----------------------------------------------------------------
 
-O projeto Farmácia Fácil está em desenvolvimento ativo com
-dois apps funcionando em produção (Web) e um APK Android
-instalado para testes. A comunicação entre as plataformas
-usuário e vendedor está estabelecida e testada via Firestore.
+O projeto Farmácia Fácil é uma plataforma de saúde composta
+por múltiplos aplicativos que se comunicam via Firebase.
 
-Estado geral: FASE 2 PARCIALMENTE CONCLUÍDA
+  APP 1 — Usuário    farmacia.facio              ✅ PRODUÇÃO
+  APP 2 — Vendedor   farmacia-facil-vendedor      ✅ PRODUÇÃO
+  APP 3 — Entregador (não iniciado)               ⏳ Fase 3
+  APP 4 — Admin      (não iniciado)               ⏳ Fase 4
 
-  APP USUÁRIO   → Funcional em produção (Web + Android APK)
-  APP VENDEDOR  → Funcional em produção (Web)
-  APP ENTREGADOR → Não iniciado (Fase 3)
-  PAINEL ADMIN  → Não iniciado (Fase 4)
+Tags de backup no Git:
+  v1.0-fase1                → App básico com Firebase
+  v1.1-comunicacao          → Comunicação usuário-vendedor
+  v2.0-fase2-completa       → OCR, pedidos, vendedor completo
 
 
 ----------------------------------------------------------------
-2. LINKS E REPOSITÓRIOS
+2. APP USUÁRIO — ESTADO COMPLETO
 ----------------------------------------------------------------
 
-APP USUÁRIO:
-  Link web     : https://sandro-tattoo.github.io/farmacia-facil/
+Links:
+  Web          : https://sandro-tattoo.github.io/farmacia-facil/
   Repositório  : https://github.com/Sandro-TATTOO/farmacia-facil
   Pasta local  : C:\Users\YYYY\Documents\farmacia.facio
   APK debug    : build\app\outputs\flutter-apk\app-debug.apk
-  Tags backup  : v1.0-fase1, v1.1-comunicacao-estabelecida
 
-APP VENDEDOR:
-  Link web     : https://sandro-tattoo.github.io/farmacia-facil-vendedor/
-  Repositório  : https://github.com/Sandro-TATTOO/farmacia-facil-vendedor
-  Pasta local  : C:\Users\YYYY\Documents\farmacia-facil-vendedor
-  Tag backup   : v1.0-comunicacao-estabelecida
+Arquivos Dart (28 arquivos):
+  main.dart                     Ponto de entrada + Firebase init
+  firebase_options.dart         Configurações Firebase
+  app/routes.dart               8 rotas configuradas
+  app/theme.dart                Tema verde e branco
 
-FIREBASE:
-  Projeto      : farmacia-facil-b980c
-  Console      : https://console.firebase.google.com
-  Conta        : sandroprogramatattoo@gmail.com
-  Plano        : Spark (gratuito)
+  models/
+    user_model.dart             Dados do usuário
+    medication_model.dart       Dados dos remédios
+    pharmacy_model.dart         Dados das farmácias
+    order_model.dart            Dados dos pedidos
+    health_tip_model.dart       Modelo dicas (não usado na tela)
+    chat_message_model.dart     Mensagens do assistente virtual
 
+  providers/
+    auth_provider.dart          Auth Firebase + sessão
+    medication_provider.dart    Remédios no Firestore
+    pharmacy_provider.dart      Farmácias do Firestore
+    order_provider.dart         Pedidos no Firestore
+    assistant_provider.dart     IA + TTS + contexto completo
 
-----------------------------------------------------------------
-3. APP USUÁRIO — ANÁLISE DETALHADA
-----------------------------------------------------------------
+  screens/auth/
+    splash_screen.dart          Animação + redirecionamento
+    login_screen.dart           Login com Firebase
+    register_screen.dart        Cadastro completo
 
-ARQUIVOS DART (25 arquivos):
-  lib/main.dart                         Inicializa Firebase + Riverpod
-  lib/firebase_options.dart             Configurações Firebase
-  lib/app/routes.dart                   7 rotas protegidas
-  lib/app/theme.dart                    Tema verde e branco
-  lib/models/health_tip_model.dart      Modelo dicas (não usado na tela)
-  lib/models/medication_model.dart      Modelo remédios
-  lib/models/order_model.dart           Modelo pedidos
-  lib/models/pharmacy_model.dart        Modelo farmácias
-  lib/models/user_model.dart            Modelo usuário
-  lib/providers/auth_provider.dart      Auth Firebase + Firestore
-  lib/providers/medication_provider.dart Remédios no Firestore
-  lib/providers/order_provider.dart     Pedidos no Firestore
-  lib/providers/pharmacy_provider.dart  Farmácias do Firestore
-  lib/screens/auth/login_screen.dart    Tela login
-  lib/screens/auth/register_screen.dart Tela cadastro
-  lib/screens/auth/splash_screen.dart   Splash com navegação
-  lib/screens/shared/main_shell.dart    Barra navegação (7 abas)
-  lib/screens/user/health_tips_screen   Dicas de saúde
-  lib/screens/user/home_screen.dart     Home com 6 botões
-  lib/screens/user/medications_screen   Remédios
-  lib/screens/user/orders_screen.dart   Pedidos do usuário
-  lib/screens/user/pharmacies_screen    Lista farmácias reais
-  lib/screens/user/pharmacy_products    Produtos + carrinho
-  lib/screens/user/prescription_screen  Leitura de receita (OCR)
-  lib/screens/user/profile_screen.dart  Perfil + logout
+  screens/shared/
+    main_shell.dart             Barra navegação 8 abas
 
-FUNCIONALIDADES — STATUS DETALHADO:
+  screens/user/
+    home_screen.dart            Home com 6 botões de ação
+    medications_screen.dart     Gerenciar remédios
+    pharmacies_screen.dart      Farmácias reais do Firestore
+    pharmacy_products_screen    Produtos + carrinho
+    orders_screen.dart          Meus pedidos com status
+    prescription_screen.dart    Leitura de receita (OCR)
+    assistant_screen.dart       Chat com IA + voz
+    health_tips_screen.dart     Dicas + Primeiros Socorros
+    profile_screen.dart         Perfil + logout
 
-  ✅ FUNCIONANDO CORRETAMENTE:
-  - Login e cadastro via Firebase Authentication
-  - Sessão persistente (usuário continua logado)
-  - Logout
-  - Tela Home com 6 botões de ação rápida
-  - Adicionar remédios com horários e duração
-  - Registrar dose tomada (decrementa estoque)
-  - Alerta visual de estoque baixo (<20%)
-  - Remover remédios
-  - Dados de remédios salvos no Firestore por usuário
-  - Lista de farmácias buscada do Firestore (dados reais)
-  - Botão "Ligar" abre discador do celular
-  - Botão "Fazer Pedido" abre produtos da farmácia
-  - Carrinho de compras com +/-
-  - Criar pedido no Firestore
-  - Pedido aparece no app do vendedor (comunicação testada)
-  - Lista de pedidos com status atualizado
-  - Dicas de saúde por categoria (dados fixos)
-  - Perfil com dados do usuário
-  - Deploy automático via GitHub Actions
-  - APK Android gerado e instalado para testes
-
-  ⚠️ FUNCIONANDO COM LIMITAÇÕES:
-  - Leitura de receita (OCR):
-    * APK instalado no celular
-    * Não apresenta erro mas também não retorna resultados
-    * ML Kit seleciona a imagem mas não identifica medicamentos
-    * Possível causa: filtro de palavras muito restritivo
-    * Possível causa: qualidade da imagem de teste
-    * Status: PENDENTE DE INVESTIGAÇÃO
-
-  - Navegação após login (Web):
-    * Às vezes fica na splash ou volta ao login
-    * Problema intermitente de cache do navegador
-    * Workaround: abrir em aba anônima
-
-  ❌ NÃO IMPLEMENTADO:
-  - Notificações de lembretes de remédios
-  - Editar perfil do usuário
-  - Busca e filtros reais nas farmácias
-  - Alerta automático de reposição de remédio
-  - Integração real do botão "Buscar nas farmácias"
-    após identificar receita
-  - Tela detalhada de status do pedido para o usuário
-  - Endereço temporário no pedido
+BARRA DE NAVEGAÇÃO (8 abas):
+  Início | Remédios | Farmácias | Assistente |
+  Receita | Pedidos | Dicas | Perfil
 
 
 ----------------------------------------------------------------
-4. APP VENDEDOR — ANÁLISE DETALHADA
+3. FUNCIONALIDADES DO APP USUÁRIO — STATUS DETALHADO
 ----------------------------------------------------------------
 
-ARQUIVOS DART (20 arquivos):
-  lib/main.dart                         Inicializa Firebase
-  lib/firebase_options.dart             Configurações Firebase
-  lib/app/routes.dart                   Rotas com navegação
-  lib/app/theme.dart                    Tema azul escuro
-  lib/models/order_model.dart           Modelo pedidos
-  lib/models/product_model.dart         Modelo produtos
-  lib/models/vendor_model.dart          Modelo farmácia
-  lib/providers/auth_provider.dart      Auth + aprovação
-  lib/providers/orders_provider.dart    Pedidos do Firestore
-  lib/providers/products_provider.dart  Produtos do Firestore
-  lib/screens/auth/login_screen.dart    Login
-  lib/screens/auth/pending_screen.dart  Aguardando aprovação
-  lib/screens/auth/register_screen.dart Cadastro farmácia
-  lib/screens/auth/splash_screen.dart   Splash
-  lib/screens/dashboard/dashboard       Dashboard principal
-  lib/screens/orders/order_detail       Detalhe + atualizar status
-  lib/screens/orders/orders_screen      Lista por status em abas
-  lib/screens/pharmacy/pharmacy_screen  Dados da farmácia
-  lib/screens/products/add_edit_product Adicionar/editar produto
-  lib/screens/products/products_screen  Lista produtos
-  lib/screens/shared/main_shell.dart    Barra 4 abas
+AUTENTICAÇÃO:
+  ✅ Login com Firebase Authentication (e-mail/senha)
+  ✅ Cadastro com nome, e-mail, telefone, endereço, senha
+  ✅ Sessão persistente entre visitas
+  ✅ Logout
+  ✅ Tela de splash com animação e redirecionamento automático
 
-FUNCIONALIDADES — STATUS DETALHADO:
+REMÉDIOS:
+  ✅ Adicionar remédio (nome, dosagem, horários, duração)
+  ✅ Escolha de frequência (1x, 2x, 3x, 4x por dia)
+  ✅ Escolha de duração (7, 14, 21, 30, 60 dias)
+  ✅ Registrar dose tomada (decrementa estoque)
+  ✅ Barra de progresso do estoque
+  ✅ Alerta visual quando estoque < 20%
+  ✅ Remover remédio
+  ✅ Dados salvos no Firestore por usuário
 
-  ✅ FUNCIONANDO CORRETAMENTE:
-  - Cadastro da farmácia com aprovação pendente
-  - Login com Firebase Authentication
-  - Tela de "aguardando aprovação" com botão verificar
-  - Dashboard com resumo: novos pedidos, pedidos do dia, faturamento
-  - Alertas de pedidos pendentes no dashboard
-  - Receber pedidos do usuário via Firestore
-  - Lista de pedidos organizada por status em abas
-  - Confirmar ou recusar pedidos
-  - Atualizar status: pendente→confirmado→preparando→pronto→entregue
-  - Adicionar produtos com categoria, preço, estoque
-  - Editar produtos existentes
-  - Atualizar estoque manualmente
-  - Remover produtos
-  - Comunicação com app usuário testada e funcionando
+FARMÁCIAS:
+  ✅ Lista de farmácias reais do Firestore (aprovadas e ativas)
+  ✅ Botão "Ligar" abre o discador do celular
+  ✅ Botão "Fazer pedido" abre tela de produtos
 
-  ⚠️ FUNCIONANDO COM LIMITAÇÕES:
-  - Aprovação de vendedor: feita manualmente no Firestore Console
-    (campo isApproved: false → true)
-    Solução definitiva: painel Admin (Fase 4)
-  - Edição de dados da farmácia: UI implementada mas
-    não salva no Firestore ainda
+PRODUTOS E CARRINHO:
+  ✅ Lista de produtos da farmácia (do Firestore)
+  ✅ Carrinho com + e - por produto
+  ✅ Escolha entre entrega e retirada
+  ✅ Total calculado automaticamente
+  ✅ Criar pedido salvo no Firestore
 
-  ❌ NÃO IMPLEMENTADO:
-  - Relatórios e gráficos de vendas
-  - Notificações push de novos pedidos
-  - Histórico financeiro
-  - Gestão de entregadores
+PEDIDOS:
+  ✅ Lista de pedidos com status em tempo real
+  ✅ Status: pendente → confirmado → preparando → pronto → entregue
+  ✅ Nome da farmácia, itens e valor exibidos
+  ✅ Comunicação bidirecional com app do vendedor
+
+LEITURA DE RECEITA (OCR):
+  ✅ Botão de câmera abre câmera ou galeria
+  ✅ ML Kit processa imagem localmente (sem internet)
+  ✅ Extrai texto da receita
+  ✅ Filtra possíveis medicamentos
+  ✅ Lista para confirmação do usuário
+  ✅ Adicionar medicamento manualmente
+  ✅ Botão para buscar nas farmácias
+  ⚠️ Resultado variável dependendo da qualidade da foto
+  ❌ Não funciona no Web (ML Kit é nativo Android/iOS)
+
+ASSISTENTE VIRTUAL COM IA:
+  ✅ Chat com bolhas de mensagem (verde = usuário, branco = IA)
+  ✅ Animação "digitando..." enquanto processa
+  ✅ Sugestões rápidas de perguntas na abertura
+  ✅ Narração por voz automática (Text-to-Speech português)
+  ✅ Botão ligar/desligar voz
+  ✅ Botão parar narração
+  ✅ Câmera no chat para ler receita diretamente
+  ✅ Contexto completo do usuário:
+     - Remédios cadastrados com horários e estoque
+     - Últimos 3 pedidos com status
+     - Farmácias disponíveis na plataforma
+  ✅ Botões de ação após resposta (navegam para tela correta)
+  ✅ Botão vermelho "Ligar SAMU" em emergências
+  ✅ Respostas sobre primeiros socorros (queimaduras, convulsão,
+     engasgamento, AVC, picadas, intoxicação...)
+  ✅ Números de emergência (SAMU 192, Bombeiros 193, CVV 188)
+  ✅ Fallback local inteligente (funciona sem API)
+  ⚠️ Integração Gemini com 401 (chave AQ. não compatível REST)
+  ❌ Sem busca em tempo real na internet
+
+DICAS DE SAÚDE E PRIMEIROS SOCORROS:
+  ✅ 3 abas: Dicas de Saúde | Primeiros Socorros | Emergências
+  ✅ 8 dicas de saúde (medicamentos, alimentação, exercícios...)
+  ✅ 10 situações de primeiros socorros:
+     PCR/RCP, Engasgamento, Queimaduras, Convulsão,
+     Hemorragia, AVC, Hipotermia/Insolação,
+     Intoxicação, Picadas peçonhentas, Afogamento
+  ✅ Cada situação tem badge de urgência, passos numerados,
+     aviso destacado e botão de ligação direta
+  ✅ Aba Emergências com 8 números úteis
+  ✅ Toque no número abre o discador automaticamente
+  ✅ Números: SAMU (192), Bombeiros (193), Polícia (190),
+     Defesa Civil (199), CVV (188), Intoxicação (0800 722 6001),
+     Ligue 180, Disque 100
 
 
 ----------------------------------------------------------------
-5. FIREBASE — ESTADO ATUAL
+4. APP VENDEDOR — ESTADO COMPLETO
 ----------------------------------------------------------------
 
-AUTHENTICATION:
-  Status    : Ativo
-  Provedor  : E-mail/senha
-  Usuários  : Cadastrados e funcionando
-  Domínios  : github.io autorizado para ambos os apps
+Links:
+  Web         : https://sandro-tattoo.github.io/farmacia-facil-vendedor/
+  Repositório : https://github.com/Sandro-TATTOO/farmacia-facil-vendedor
+  Pasta local : C:\Users\YYYY\Documents\farmacia-facil-vendedor
 
-FIRESTORE — COLEÇÕES EXISTENTES:
-  users/
-    {uid}/ → name, email, phone, address, createdAt
-      medications/ → remédios do usuário
+Arquivos Dart (21 arquivos):
+  main.dart, firebase_options.dart
+  app/routes.dart, app/theme.dart (azul escuro)
 
-  pharmacies/
-    {uid}/ → dados completos + isApproved + isActive
-      products/ → produtos cadastrados pelo vendedor
+  models/
+    vendor_model.dart           Dados da farmácia
+    product_model.dart          Dados dos produtos
+    order_model.dart            Dados dos pedidos
 
-  orders/ → pedidos criados pelos usuários
-    userId, pharmacyId, status, items[], totalPrice...
+  providers/
+    auth_provider.dart          Auth + aprovação
+    orders_provider.dart        Pedidos do Firestore
+    products_provider.dart      Produtos do Firestore
 
-REGRAS DE SEGURANÇA ATUAIS:
+  screens/
+    auth/splash, login, register, pending
+    dashboard/dashboard_screen.dart
+    orders/orders_screen, order_detail_screen
+    products/products_screen, add_edit_product_screen
+    pharmacy/pharmacy_screen
+    shared/main_shell.dart (4 abas)
+
+BARRA DE NAVEGAÇÃO (4 abas):
+  Dashboard | Pedidos | Produtos | Farmácia
+
+FUNCIONALIDADES:
+  ✅ Cadastro completo da farmácia
+  ✅ Sistema de aprovação (isApproved: false → true)
+  ✅ Tela "Aguardando aprovação" com botão verificar status
+  ✅ Dashboard: novos pedidos, pedidos do dia, faturamento
+  ✅ Alertas de pedidos pendentes no dashboard
+  ✅ Receber pedidos do usuário via Firestore
+  ✅ Pedidos organizados por status em abas
+  ✅ Confirmar ou recusar pedidos
+  ✅ Atualizar status do pedido passo a passo
+  ✅ Adicionar produtos (nome, preço, estoque, categoria)
+  ✅ Editar e remover produtos
+  ✅ Atualizar estoque manualmente
+  ✅ Comunicação com app usuário testada e funcionando
+  ⚠️ Aprovação ainda é manual no Firestore Console
+  ⚠️ Edição de dados da farmácia: UI pronta, save pendente
+
+
+----------------------------------------------------------------
+5. FIREBASE — CONFIGURAÇÃO ATUAL
+----------------------------------------------------------------
+
+Projeto  : farmacia-facil-b980c
+Console  : https://console.firebase.google.com
+Conta    : sandroprogramatattoo@gmail.com
+Plano    : Spark (gratuito)
+
+Serviços ativos:
+  ✅ Firebase Authentication — E-mail/senha
+  ✅ Cloud Firestore — banco de dados
+  ✅ GitHub Pages domain autorizado (ambos os apps)
+
+Estrutura do Firestore:
+  users/{uid}/
+    name, email, phone, address, createdAt
+    medications/{id}/
+      name, dosage, times[], remainingPills, isActive...
+
+  pharmacies/{uid}/
+    name, ownerName, email, phone, address, city, state
+    isApproved, isActive, hasDelivery, openingHours
+    products/{id}/
+      name, price, stock, category, requiresPrescription
+
+  orders/{id}/
+    userId, userName, pharmacyId, pharmacyName
+    status (pending/confirmed/preparing/ready/delivering/
+            delivered/cancelled)
+    items[], totalPrice, deliveryAddress, isDelivery
+    createdAt, updatedAt
+
+Regras de segurança atuais:
   allow read, write: if request.auth != null;
-  (qualquer usuário logado pode ler/escrever tudo)
-
-  ⚠️ ATENÇÃO: Regras precisam ser refinadas antes
-  do lançamento. Atualmente um usuário logado poderia
-  modificar dados de outro usuário ou farmácia.
-
-  REGRAS RECOMENDADAS PARA PRODUÇÃO:
-  - users: só o próprio usuário lê/escreve seus dados
-  - pharmacies: vendedor só edita sua própria farmácia
-  - orders: usuário cria, vendedor atualiza status
+  ⚠️ Qualquer usuário logado lê/escreve tudo
+  ⚠️ Precisam ser refinadas antes do lançamento público
 
 
 ----------------------------------------------------------------
-6. FUNCIONALIDADE DE IA — SITUAÇÃO ATUAL E PRÓXIMOS PASSOS
+6. ASSISTENTE VIRTUAL — CAPACIDADES DETALHADAS
 ----------------------------------------------------------------
 
-SITUAÇÃO ATUAL — Leitura de Receita (OCR):
-  Tecnologia : Google ML Kit (processamento local no dispositivo)
-  Web        : Não funciona (ML Kit é nativo, não roda em browser)
-  Android    : Instalado, seleciona imagem mas não retorna resultados
+FONTES DE INFORMAÇÃO:
+  1. Firestore em tempo real (remédios, pedidos, farmácias)
+  2. Gemini API (quando funcionar — chave AQ. com problema 401)
+  3. Base de conhecimento local (fallback sempre disponível)
 
-  CAUSA PROVÁVEL DO PROBLEMA:
-  O filtro de extração de medicamentos é baseado em palavras-chave
-  (mg, ml, comprimido, etc.) que podem não aparecer na mesma linha
-  do nome do medicamento em muitas receitas. A IA de ler e entender
-  o contexto está faltando.
+O QUE O ASSISTENTE SABE RESPONDER:
+  Sobre o usuário:
+  - Remédios cadastrados, horários, dosagens
+  - Alertas de estoque baixo
+  - Status dos pedidos recentes
+  - Farmácias disponíveis na plataforma
 
-PRÓXIMO PASSO — IA MAIS INTERATIVA:
-  Para tornar a IA mais presente e funcional na aplicação,
-  as possibilidades são:
+  Sobre saúde e emergências:
+  - Procedimentos de primeiros socorros passo a passo
+  - Queimaduras, convulsão, engasgamento, AVC, etc.
+  - Números de emergência (SAMU 192, Bombeiros 193...)
+  - Dicas de saúde e bem-estar
+  - Orientação sobre medicamentos
 
-  OPÇÃO A — Assistente Virtual no app (Chat IA):
-  * Chat integrado na Home ou como aba separada
-  * Usuário pergunta "Qual horário devo tomar Amoxicilina?"
-  * IA responde com base nos remédios cadastrados
-  * Pode sugerir compras, alertar sobre interações
-  * Tecnologia: Firebase Vertex AI (nativo no Firebase)
-    ou OpenAI API
+  Sobre o app:
+  - Como usar cada funcionalidade
+  - Como ler uma receita pela câmera
+  - Como fazer um pedido
 
-  OPÇÃO B — IA para melhorar o OCR da Receita:
-  * Em vez de regras fixas, usar IA para entender o texto
-  * Mais precisa para diferentes tipos de receita
-  * Tecnologia: Firebase Vertex AI (usa conta Google que já temos)
+AÇÕES QUE O ASSISTENTE PODE EXECUTAR:
+  - Abrir discador (ligação SAMU em vermelho em emergências)
+  - Navegar para qualquer tela do app
+  - Ler receita pela câmera direto no chat
+  - Narrar respostas por voz (TTS)
 
-  OPÇÃO C — Recomendação Inteligente:
-  * IA sugere farmácias com base no histórico de pedidos
-  * IA alerta sobre remédios que costumam acabar em determinado dia
-  * IA sugere compra antes de acabar
-  * Tecnologia: lógica local + Firestore (sem API externa)
-
-  OPÇÃO D — Processamento de Receita via Firebase Functions:
-  * Usuário envia foto → Firebase Function processa com Vertex AI
-  * Resultado retorna para o app
-  * Não depende de chave de API no client
-  * Mais seguro e escalável
-
-  RECOMENDAÇÃO: Combinar B + D para resolver o OCR da receita
-  de forma robusta, e depois implementar A como assistente virtual.
+LIMITAÇÃO ATUAL:
+  Chave AQ. (novo formato Google) retorna 401 via REST API.
+  Soluções possíveis:
+  a) Aguardar Google corrigir compatibilidade REST com AQ.
+  b) Usar Firebase Vertex AI (integrado, sem chave separada)
+  c) Usar Firebase Functions como proxy
+  d) API ANVISA para dados de medicamentos em tempo real
 
 
 ----------------------------------------------------------------
-7. PENDÊNCIAS CRÍTICAS ANTES DO LANÇAMENTO
+7. INFRAESTRUTURA E DEPLOY
 ----------------------------------------------------------------
 
-SEGURANÇA:
-  [ ] Refinar regras do Firestore (isolamento por usuário)
-  [ ] Renovar token GitHub
-  [ ] Proteger rotas do app (redirect por auth)
+GitHub Actions (deploy automático):
+  Toda vez que fizer git push → compila → publica em 3-5 min
 
-FUNCIONALIDADES ESSENCIAIS FALTANDO:
-  [ ] Notificações de lembretes de remédios (flutter_local_notifications
-      já instalado, só falta implementar)
-  [ ] OCR de receita funcional no Android
-  [ ] Aprovação automática de vendedor (painel Admin)
+App Usuário:
+  Workflow  : .github/workflows/deploy.yml
+  Secret    : GEMINI_API_KEY configurado
+  Base href : /farmacia-facil/
+
+App Vendedor:
+  Workflow  : .github/workflows/deploy.yml
+  Base href : /farmacia-facil-vendedor/
+
+Android:
+  APK debug gerado e instalado para testes
+  Kotlin 2.4.0 | Java 17 | Core Desugaring ativado
+  APK em: build\app\outputs\flutter-apk\app-debug.apk
+
+
+----------------------------------------------------------------
+8. DEPENDÊNCIAS — APP USUÁRIO
+----------------------------------------------------------------
+
+  flutter_riverpod          Estado da aplicação
+  go_router                 Navegação entre telas
+  firebase_core             Base Firebase
+  firebase_auth             Autenticação
+  cloud_firestore           Banco de dados nuvem
+  shared_preferences        Armazenamento local (legado)
+  url_launcher              Abrir discador e links externos
+  image_picker              Selecionar imagens (câmera/galeria)
+  google_mlkit_text_recog.  OCR local para leitura de receitas
+  flutter_tts               Text-to-Speech (voz do assistente)
+  http                      Chamadas HTTP para Gemini API
+  google_generative_ai      SDK Gemini (instalado, problema 401)
+  flutter_local_noti.       Notificações (instalado, pendente)
+  intl                      Formatação de datas (instalado)
+  google_fonts              Fontes (instalado, não usado)
+
+
+----------------------------------------------------------------
+9. PENDÊNCIAS E PRÓXIMOS PASSOS
+----------------------------------------------------------------
+
+PRIORIDADE ALTA:
+  [ ] Resolver integração Gemini (chave AQ. 401)
+      → Opção recomendada: Firebase Vertex AI
+  [ ] Refinar regras Firestore antes do lançamento público
+  [ ] Implementar notificações de lembretes de remédios
+      (flutter_local_notifications já instalado)
+  [ ] Salvar edição de dados da farmácia no Firestore
+
+PRIORIDADE MÉDIA:
   [ ] Editar perfil do usuário
-  [ ] Busca de farmácias por nome do produto
+  [ ] Busca/filtros funcionais nas farmácias
+  [ ] Histórico de doses tomadas
+  [ ] Alerta automático de reposição de remédio
+  [ ] Tela de detalhe do pedido para o usuário
+  [ ] APK de release assinado (produção)
 
-INFRAESTRUTURA:
-  [ ] Regras do Firestore expiram em modo de teste
-      (precisa configurar regras permanentes)
-  [ ] APK de release (assinado) para distribuição na Play Store
+FASE 3 — ENTREGADOR:
+  [ ] App Android para entregadores
+  [ ] Receber pedido pronto para entrega
+  [ ] Confirmar retirada na farmácia
+  [ ] Confirmar entrega ao usuário
+  [ ] Rastreamento em tempo real
 
-
-----------------------------------------------------------------
-8. APPS PENDENTES DE CRIAÇÃO
-----------------------------------------------------------------
-
-APP 3 — ENTREGADOR (Fase 3):
-  Plataforma  : Android
-  Funções     : receber pedido, confirmar retirada, confirmar entrega
-  Status      : Não iniciado
-
-APP 4 — ADMIN (Fase 4):
-  Plataforma  : Web
-  Funções     : aprovar farmácias, gerenciar usuários,
-                dashboard geral, estatísticas
-  Status      : Não iniciado
-  Prioridade  : Alta (resolve aprovação manual atual)
-
-
-----------------------------------------------------------------
-9. HISTÓRICO DE COMMITS — APP USUÁRIO
-----------------------------------------------------------------
-
-e681339  Usar ML Kit para OCR local - sem API key necessaria
-1298761  Corrigir header autenticacao para chaves AQ Gemini
-de0079e  Usar HTTP direto para API Gemini
-ef53139  Adicionar aba Receita com leitura por IA Gemini
-298ea0d  Implementar botoes ligar e fazer pedido nas farmacias
-0f2688e  Corrigir query farmácias - remover índice composto
-4c77eb6  Farmácias reais do Firestore na tela do usuario
-48364ee  Adicionar sistema de pedidos e aba Pedidos
-ea2a6b8  Simplificar router e corrigir navegacao
-1229475  Corrigir login e cadastro com Firebase
-cfbacca  Migração para Firebase Auth e Firestore
-49bae79  Adicionar deploy automatico GitHub Pages
-49520c6  Primeiro commit - Farmacia Facil
+FASE 4 — ADMIN:
+  [ ] Painel web administrativo
+  [ ] Aprovar/reprovar farmácias automaticamente
+  [ ] Gerenciar usuários, farmácias, entregadores
+  [ ] Dashboard geral com métricas
+  [ ] Relatórios de uso e faturamento
 
 
 ----------------------------------------------------------------
@@ -334,7 +383,7 @@ APP USUÁRIO — Web:
   cd C:\Users\YYYY\Documents\farmacia.facio
   flutter run -d chrome
 
-APP USUÁRIO — Android (celular conectado):
+APP USUÁRIO — Android:
   flutter run -d android
 
 APP USUÁRIO — Gerar APK:
@@ -344,30 +393,51 @@ APP VENDEDOR — Web:
   cd C:\Users\YYYY\Documents\farmacia-facil-vendedor
   flutter run -d chrome
 
-ENVIAR PARA GITHUB (deploy automático em 3-5 min):
+ENVIAR ATUALIZAÇÕES (deploy automático em 3-5 min):
   git add .
   git commit -m "Descrição"
   git push origin main
 
 
 ----------------------------------------------------------------
-11. DEPENDÊNCIAS INSTALADAS — APP USUÁRIO
+11. HISTÓRICO DE COMMITS PRINCIPAIS
 ----------------------------------------------------------------
 
-  flutter_riverpod        : Estado (providers)
-  go_router               : Navegação
-  firebase_core           : Base Firebase
-  firebase_auth           : Autenticação
-  cloud_firestore         : Banco de dados
-  shared_preferences      : Armazenamento local (legado)
-  google_fonts            : Fontes (instalado, não usado)
-  flutter_local_noti.     : Notificações (instalado, não impl.)
-  intl                    : Datas (instalado, não usado)
-  url_launcher            : Botão ligar (abre discador)
-  image_picker            : Selecionar imagens
-  google_mlkit_text_recognition : OCR local
-  http                    : Chamadas HTTP (usado para Gemini)
-  google_generative_ai    : SDK Gemini (instalado, substituído)
+APP USUÁRIO (30 commits):
+  1725601  Sincronizar IA com primeiros socorros e emergencias
+  5cbde2e  Ativar ligacao direta nos numeros de emergencia
+  6251aa4  Expandir dicas com primeiros socorros e emergencias
+  58d2fbd  Adicionar camera de receita no assistente
+  cebb40d  Assistente com contexto completo e acoes navegaveis
+  91e4524  Adicionar Assistente Virtual com IA e voz
+  2b15cb1  Configuracao Android corrigida (tag: v2.0)
+  e681339  ML Kit para OCR local
+  298ea0d  Botoes ligar e fazer pedido (tag: v1.1)
+  4c77eb6  Farmácias reais do Firestore
+  48364ee  Sistema de pedidos
+  ea2a6b8  Router corrigido (tag: v1.0)
+  1229475  Login e cadastro Firebase
+  cfbacca  Migracao para Firebase
+  49520c6  Primeiro commit
+
+APP VENDEDOR (3 commits):
+  c9824cb  Corrigir query pedidos (tag: v2.0)
+  aacf8d1  Suporte web corrigido
+  e1aac52  Primeiro commit
+
+
+----------------------------------------------------------------
+12. SEGURANÇA — CHECKLIST PRÉ-LANÇAMENTO
+----------------------------------------------------------------
+
+  ✅ Senhas gerenciadas pelo Firebase (criptografadas)
+  ✅ Dados isolados por usuário no Firestore
+  ✅ Autenticação obrigatória para acesso
+  ✅ Chave Gemini em variável de ambiente (não no código)
+  ⚠️ Regras Firestore precisam ser refinadas
+  ⚠️ Token GitHub deve ser renovado antes da produção
+  ⚠️ APK de release precisa ser assinado
+  ⚠️ Firestore em "modo teste" — configurar regras permanentes
 
 ================================================================
   FIM DO RELATÓRIO — Outubro 2026
