@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import '../../providers/assistant_provider.dart';
 import '../../models/chat_message_model.dart';
@@ -26,7 +27,9 @@ class _AssistantScreenState extends ConsumerState<AssistantScreen> {
   static const _suggestions = [
     'Quais remédios devo tomar hoje?',
     'Algum remédio está acabando?',
-    'Quais são meus horários de medicação?',
+    'Como funciona a leitura de receita?',
+    'O que fazer em caso de queimadura?',
+    'Qual o número do SAMU?',
     'Me dê uma dica de saúde',
   ];
 
@@ -469,19 +472,29 @@ class _ActionsWidget extends StatelessWidget {
         child: Wrap(
           spacing: 8,
           runSpacing: 8,
-          children: actions.map((a) => ElevatedButton.icon(
-            onPressed: () => onTap(a.route),
-            icon: Text(a.icon, style: const TextStyle(fontSize: 14)),
-            label: Text(a.label, style: const TextStyle(fontSize: 12)),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.primaryGreen,
-              foregroundColor: Colors.white,
-              minimumSize: Size.zero,
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20)),
-            ),
-          )).toList(),
+          children: actions.map((a) {
+            final isEmergency = a.isCall && (a.phone == '192' || a.phone == '193');
+            return ElevatedButton.icon(
+              onPressed: () async {
+                if (a.isCall && a.phone != null) {
+                  final uri = Uri.parse('tel:${a.phone!.replaceAll(RegExp(r'[\s\-]'), '')}');
+                  if (await canLaunchUrl(uri)) await launchUrl(uri);
+                } else {
+                  onTap(a.route);
+                }
+              },
+              icon: Text(a.icon, style: const TextStyle(fontSize: 14)),
+              label: Text(a.label, style: const TextStyle(fontSize: 12)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: isEmergency ? Colors.red : AppTheme.primaryGreen,
+                foregroundColor: Colors.white,
+                minimumSize: Size.zero,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20)),
+              ),
+            );
+          }).toList(),
         ),
       );
 }

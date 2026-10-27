@@ -10,26 +10,30 @@ import '../models/medication_model.dart';
 
 const _geminiKey = String.fromEnvironment('GEMINI_API_KEY', defaultValue: '');
 
-// ─── Ação navegável que o assistente pode sugerir ─────────────────────────────
+// ─── Ação navegável ───────────────────────────────────────────────────────────
 class AssistantAction {
   final String label;
   final String route;
   final String icon;
+  final bool   isCall;   // true = abre discador em vez de navegar
+  final String? phone;
 
   const AssistantAction({
     required this.label,
     required this.route,
     required this.icon,
+    this.isCall = false,
+    this.phone,
   });
 }
 
 // ─── Estado ───────────────────────────────────────────────────────────────────
 class AssistantState {
-  final List<ChatMessage>    messages;
-  final bool                 isLoading;
-  final bool                 voiceEnabled;
-  final bool                 isSpeaking;
-  final List<AssistantAction> pendingActions; // botões de ação na última mensagem
+  final List<ChatMessage>     messages;
+  final bool                  isLoading;
+  final bool                  voiceEnabled;
+  final bool                  isSpeaking;
+  final List<AssistantAction> pendingActions;
 
   const AssistantState({
     this.messages       = const [],
@@ -40,10 +44,10 @@ class AssistantState {
   });
 
   AssistantState copyWith({
-    List<ChatMessage>?    messages,
-    bool?                 isLoading,
-    bool?                 voiceEnabled,
-    bool?                 isSpeaking,
+    List<ChatMessage>?     messages,
+    bool?                  isLoading,
+    bool?                  voiceEnabled,
+    bool?                  isSpeaking,
     List<AssistantAction>? pendingActions,
   }) => AssistantState(
     messages:       messages       ?? this.messages,
@@ -67,14 +71,16 @@ class AssistantNotifier extends Notifier<AssistantState> {
       ChatMessage(
         id:        'welcome',
         text:      'Olá! 👋 Sou o assistente do Farmácia Fácil.\n\n'
-                   'Conheço seus remédios, pedidos e posso te guiar pelo app. '
-                   'Pergunte o que precisar!',
+                   'Conheço seus remédios, pedidos e posso te ajudar com '
+                   'primeiros socorros, emergências e dicas de saúde.\n\n'
+                   'Como posso te ajudar hoje?',
         role:      MessageRole.assistant,
         createdAt: DateTime.now(),
       ),
     ]);
   }
 
+  // ── TTS ────────────────────────────────────────────────────────────────────
   Future<void> _initTts() async {
     try {
       await _tts.setLanguage('pt-BR');
@@ -109,7 +115,7 @@ class AssistantNotifier extends Notifier<AssistantState> {
     }
   }
 
-  // ── Envia mensagem do sistema sem aguardar IA (para contexto de câmera) ───
+  // ── Mensagem de sistema (câmera, etc.) ─────────────────────────────────────
   void sendImageMessage(String text) {
     final msg = ChatMessage(
       id:        's${DateTime.now().millisecondsSinceEpoch}',
@@ -121,7 +127,7 @@ class AssistantNotifier extends Notifier<AssistantState> {
     state = state.copyWith(messages: [...state.messages, msg]);
   }
 
-  // ── Envia mensagem ─────────────────────────────────────────────────────────
+  // ── Envia mensagem principal ────────────────────────────────────────────────
   Future<void> sendMessage(String text) async {
     if (text.trim().isEmpty || state.isLoading) return;
 
@@ -147,33 +153,32 @@ class AssistantNotifier extends Notifier<AssistantState> {
     );
 
     try {
-      // Busca TODOS os contextos do usuário
       final context = await _buildFullContext();
-
-      // Detecta intenção para gerar ações navegáveis
-      final actions = _detectActions(text.toLowerCase(), context);
-
-      // Chama a IA
+      final lower   = text.toLowerCase();
+      final actions = _detectActions(lower, context);
       final response = await _callGemini(text.trim(), context);
 
-      final updated = state.messages.where((m) => m.id != 'loading' && !m.isLoading).toList();
-      final assistantMsg = ChatMessage(
-        id:        'a${DateTime.now().millisecondsSinceEpoch}',
-        text:      response,
-        role:      MessageRole.assistant,
-        createdAt: DateTime.now(),
-      );
+      final updated = state.messages
+          .where((m) => m.id != 'loading' && !m.isLoading)
+          .toList();
 
       state = state.copyWith(
-        messages:       [...updated, assistantMsg],
+        messages: [...updated, ChatMessage(
+          id:        'a${DateTime.now().millisecondsSinceEpoch}',
+          text:      response,
+          role:      MessageRole.assistant,
+          createdAt: DateTime.now(),
+        )],
         isLoading:      false,
         pendingActions: actions,
       );
 
       await _speak(response);
 
-    } catch (e) {
-      final updated = state.messages.where((m) => m.id != 'loading' && !m.isLoading).toList();
+    } catch (_) {
+      final updated = state.messages
+          .where((m) => m.id != 'loading' && !m.isLoading)
+          .toList();
       state = state.copyWith(
         messages: [...updated, ChatMessage(
           id:        'err${DateTime.now().millisecondsSinceEpoch}',
@@ -181,7 +186,7 @@ class AssistantNotifier extends Notifier<AssistantState> {
           role:      MessageRole.assistant,
           createdAt: DateTime.now(),
         )],
-        isLoading: false,
+        isLoading:      false,
         pendingActions: [],
       );
     }
@@ -194,24 +199,21 @@ class AssistantNotifier extends Notifier<AssistantState> {
 
     final buffer = StringBuffer();
 
-    // 1. Remédios
+    // Remédios
     try {
-      final medsSnap = await _firestore
-          .collection('users')
-          .doc(uid)
-          .collection('medications')
-          .where('isActive', isEqualTo: true)
-          .get();
+      final snap = await _firestore
+          .collection('users').doc(uid).collection('medications')
+          .where('isActive', isEqualTo: true).get();
 
-      if (medsSnap.docs.isEmpty) {
+      if (snap.docs.isEmpty) {
         buffer.writeln('REMÉDIOS: Nenhum remédio cadastrado.');
       } else {
         buffer.writeln('REMÉDIOS CADASTRADOS:');
-        for (final doc in medsSnap.docs) {
+        for (final doc in snap.docs) {
           final m = MedicationModel.fromMap({'id': doc.id, ...doc.data()});
           buffer.writeln(
             '- ${m.name} (${m.dosage}): ${m.timesPerDay}x/dia '
-            'nos horários ${m.times.join(', ')}. '
+            'nos horários ${m.times.join(", ")}. '
             'Estoque: ${m.remainingPills} comprimidos. '
             '${m.isRunningLow ? "⚠️ ESTOQUE BAIXO!" : "Estoque OK."}',
           );
@@ -219,50 +221,45 @@ class AssistantNotifier extends Notifier<AssistantState> {
       }
     } catch (_) {}
 
-    // 2. Pedidos recentes
+    // Pedidos
     try {
-      final ordersSnap = await _firestore
-          .collection('orders')
-          .where('userId', isEqualTo: uid)
-          .get();
+      final snap = await _firestore
+          .collection('orders').where('userId', isEqualTo: uid).get();
 
-      final orders = ordersSnap.docs;
-      if (orders.isEmpty) {
-        buffer.writeln('\nPEDIDOS: Nenhum pedido realizado ainda.');
+      if (snap.docs.isEmpty) {
+        buffer.writeln('\nPEDIDOS: Nenhum pedido realizado.');
       } else {
-        // Ordena por data (mais recente primeiro)
-        orders.sort((a, b) {
-          final aDate = a.data()['createdAt'] as String? ?? '';
-          final bDate = b.data()['createdAt'] as String? ?? '';
-          return bDate.compareTo(aDate);
-        });
-        buffer.writeln('\nPEDIDOS RECENTES (últimos 3):');
-        for (final doc in orders.take(3)) {
+        final sorted = snap.docs
+          ..sort((a, b) {
+            final aD = a.data()['createdAt'] as String? ?? '';
+            final bD = b.data()['createdAt'] as String? ?? '';
+            return bD.compareTo(aD);
+          });
+        buffer.writeln('\nPEDIDOS RECENTES:');
+        for (final doc in sorted.take(3)) {
           final d = doc.data();
           buffer.writeln(
             '- Pedido na ${d['pharmacyName'] ?? 'farmácia'}: '
-            'status "${d['status'] ?? 'desconhecido'}", '
+            'status "${d['status'] ?? ''}", '
             'total R\$ ${(d['totalPrice'] ?? 0).toStringAsFixed(2)}.',
           );
         }
       }
     } catch (_) {}
 
-    // 3. Farmácias disponíveis
+    // Farmácias
     try {
-      final pharmSnap = await _firestore
-          .collection('pharmacies')
-          .where('isApproved', isEqualTo: true)
-          .get();
+      final snap = await _firestore
+          .collection('pharmacies').where('isApproved', isEqualTo: true).get();
 
-      if (pharmSnap.docs.isEmpty) {
-        buffer.writeln('\nFARMÁCIAS: Nenhuma farmácia disponível no momento.');
+      if (snap.docs.isEmpty) {
+        buffer.writeln('\nFARMÁCIAS: Nenhuma disponível.');
       } else {
         buffer.writeln('\nFARMÁCIAS DISPONÍVEIS:');
-        for (final doc in pharmSnap.docs) {
+        for (final doc in snap.docs) {
           final d = doc.data();
           buffer.writeln(
-            '- ${d['name'] ?? 'Farmácia'} em ${d['city'] ?? ''} '
+            '- ${d['name'] ?? ''} em ${d['city'] ?? ''} '
             '(${d['hasDelivery'] == true ? "faz entrega" : "só retirada"}).',
           );
         }
@@ -272,13 +269,47 @@ class AssistantNotifier extends Notifier<AssistantState> {
     return buffer.toString();
   }
 
-  // ── Detecta ações navegáveis com base na mensagem ─────────────────────────
+  // ── Detecta ações com base na mensagem ─────────────────────────────────────
   List<AssistantAction> _detectActions(String msg, String context) {
     final actions = <AssistantAction>[];
 
+    // Emergência — sempre prioridade máxima
+    if (_isEmergency(msg)) {
+      actions.add(const AssistantAction(
+        label: '🚨 Ligar SAMU (192)',
+        route: '',
+        icon:  '🚨',
+        isCall: true,
+        phone: '192',
+      ));
+      actions.add(const AssistantAction(
+        label: 'Ver Primeiros Socorros',
+        route: '/health-tips',
+        icon:  '🏥',
+      ));
+      return actions; // em emergência só mostra essas ações
+    }
+
+    // Primeiros socorros
+    if (_isFirstAid(msg)) {
+      actions.add(const AssistantAction(
+        label: 'Ver Primeiros Socorros',
+        route: '/health-tips',
+        icon:  '🏥',
+      ));
+      actions.add(const AssistantAction(
+        label: '📞 SAMU (192)',
+        route: '',
+        icon:  '📞',
+        isCall: true,
+        phone: '192',
+      ));
+    }
+
+    // Remédios
     if (msg.contains('remédio') || msg.contains('medicamento') ||
         msg.contains('tomar') || msg.contains('horário') ||
-        msg.contains('dose')) {
+        msg.contains('dose') || msg.contains('comprimido')) {
       actions.add(const AssistantAction(
         label: 'Ver meus remédios',
         route: '/medications',
@@ -286,8 +317,9 @@ class AssistantNotifier extends Notifier<AssistantState> {
       ));
     }
 
+    // Estoque baixo
     if (msg.contains('estoque') || msg.contains('acabando') ||
-        msg.contains('comprar') || msg.contains('repor') ||
+        msg.contains('repor') || msg.contains('comprar') ||
         context.contains('ESTOQUE BAIXO')) {
       actions.add(const AssistantAction(
         label: 'Buscar farmácias',
@@ -296,8 +328,9 @@ class AssistantNotifier extends Notifier<AssistantState> {
       ));
     }
 
+    // Pedidos
     if (msg.contains('pedido') || msg.contains('entrega') ||
-        msg.contains('status') || msg.contains('compra')) {
+        msg.contains('status') || msg.contains('encomenda')) {
       actions.add(const AssistantAction(
         label: 'Ver meus pedidos',
         route: '/orders',
@@ -305,8 +338,9 @@ class AssistantNotifier extends Notifier<AssistantState> {
       ));
     }
 
+    // Receita
     if (msg.contains('receita') || msg.contains('foto') ||
-        msg.contains('fotografar') || msg.contains('câmera')) {
+        msg.contains('câmera') || msg.contains('fotografar')) {
       actions.add(const AssistantAction(
         label: 'Ler receita',
         route: '/prescription',
@@ -314,8 +348,10 @@ class AssistantNotifier extends Notifier<AssistantState> {
       ));
     }
 
+    // Dicas / saúde
     if (msg.contains('dica') || msg.contains('saúde') ||
-        msg.contains('bem-estar') || msg.contains('cuidado')) {
+        msg.contains('bem-estar') || msg.contains('alimenta') ||
+        msg.contains('exerc') || msg.contains('sono')) {
       actions.add(const AssistantAction(
         label: 'Ver dicas de saúde',
         route: '/health-tips',
@@ -323,43 +359,70 @@ class AssistantNotifier extends Notifier<AssistantState> {
       ));
     }
 
-    if (msg.contains('farmácia') || msg.contains('loja') ||
-        msg.contains('perto')) {
-      if (!actions.any((a) => a.route == '/pharmacies')) {
-        actions.add(const AssistantAction(
-          label: 'Ver farmácias',
-          route: '/pharmacies',
-          icon:  '🏪',
-        ));
-      }
+    // Farmácias
+    if ((msg.contains('farmácia') || msg.contains('loja') ||
+         msg.contains('perto') || msg.contains('próxima')) &&
+        !actions.any((a) => a.route == '/pharmacies')) {
+      actions.add(const AssistantAction(
+        label: 'Ver farmácias',
+        route: '/pharmacies',
+        icon:  '🏪',
+      ));
     }
 
     return actions;
   }
 
-  // ── Chama o Gemini ─────────────────────────────────────────────────────────
+  // Detecta situação de emergência
+  bool _isEmergency(String msg) =>
+    msg.contains('parada') || msg.contains('infarto') ||
+    msg.contains('avc') || msg.contains('derrame') ||
+    msg.contains('desmaio') || msg.contains('inconsciente') ||
+    msg.contains('não respira') || msg.contains('parou de respirar') ||
+    msg.contains('overdose') || msg.contains('envenenamento') ||
+    msg.contains('sangramento') || msg.contains('afogou') ||
+    msg.contains('emergência') || msg.contains('socorro') ||
+    msg.contains('acidente') || msg.contains('urgência');
+
+  // Detecta necessidade de primeiros socorros
+  bool _isFirstAid(String msg) =>
+    msg.contains('queimad') || msg.contains('convulsão') ||
+    msg.contains('epilep') || msg.contains('engasgou') ||
+    msg.contains('engasgament') || msg.contains('heimlich') ||
+    msg.contains('picada') || msg.contains('cobra') ||
+    msg.contains('escorpião') || msg.contains('intoxica') ||
+    msg.contains('hipotermia') || msg.contains('insolação') ||
+    msg.contains('fratura') || msg.contains('osso quebrado') ||
+    msg.contains('primeiros socorros');
+
+  // ── Chama Gemini ──────────────────────────────────────────────────────────
   Future<String> _callGemini(String userMessage, String context) async {
     if (_geminiKey.isEmpty) return _localResponse(userMessage, context);
 
     final systemPrompt = '''
-Você é o assistente virtual do aplicativo Farmácia Fácil.
-Você tem acesso completo aos dados do usuário e ajuda com:
-- Remédios cadastrados, horários e estoques
-- Status de pedidos realizados
-- Farmácias disponíveis
-- Dicas de saúde e bem-estar
-- Orientações sobre como usar o app
+Você é o assistente virtual do aplicativo Farmácia Fácil — um assistente de saúde pessoal completo.
+
+SUAS CAPACIDADES:
+1. Remédios: informa horários, dosagens, estoques e alertas
+2. Pedidos: informa status e histórico de compras
+3. Farmácias: informa as disponíveis na plataforma
+4. Primeiros Socorros: orienta sobre queimaduras, convulsões, engasgamento, AVC, etc.
+5. Emergências: indica o número correto para cada situação (SAMU 192, Bombeiros 193, etc.)
+6. Dicas de saúde: alimentação, exercícios, sono, medicamentos, saúde mental
+7. Receitas médicas: orienta sobre como usar o recurso de leitura de receita
 
 DADOS ATUAIS DO USUÁRIO:
 $context
 
 REGRAS:
-1. Sempre responda em português do Brasil
-2. Seja simpático, direto e objetivo (máximo 3 parágrafos curtos)
-3. Use os dados reais do contexto acima nas respostas
-4. Para dúvidas médicas específicas: "Este assistente é informativo e não substitui orientação médica."
-5. Quando mencionar uma funcionalidade do app, explique como acessá-la
-6. Use emojis com moderação para tornar a resposta mais amigável
+1. Responda SEMPRE em português do Brasil
+2. Seja direto, claro e objetivo (máximo 3 parágrafos)
+3. Use os dados reais do contexto acima
+4. Em situações de emergência: indique IMEDIATAMENTE o número 192 (SAMU)
+5. Para primeiros socorros: dê os passos de forma numerada e clara
+6. Para dúvidas médicas: "Este assistente é informativo. Consulte seu médico."
+7. Use emojis com moderação
+8. Nunca invente dados que não estão no contexto
 ''';
 
     final url = Uri.parse(
@@ -377,7 +440,7 @@ REGRAS:
         'contents': [
           {'role': 'user', 'parts': [{'text': userMessage}]}
         ],
-        'generationConfig': {'temperature': 0.7, 'maxOutputTokens': 512},
+        'generationConfig': {'temperature': 0.7, 'maxOutputTokens': 600},
       }),
     ).timeout(const Duration(seconds: 20));
 
@@ -390,101 +453,218 @@ REGRAS:
     return _localResponse(userMessage, context);
   }
 
-  // ── Fallback local inteligente ─────────────────────────────────────────────
+  // ── Fallback local completo e refinado ─────────────────────────────────────
   String _localResponse(String message, String context) {
     final lower = message.toLowerCase();
 
-    // Remédios / horários
+    // ── EMERGÊNCIAS (prioridade máxima) ──
+    if (_isEmergency(lower)) {
+      return '🚨 EMERGÊNCIA DETECTADA!\n\n'
+             'Ligue IMEDIATAMENTE para o SAMU: 192\n\n'
+             'Enquanto aguarda o socorro:\n'
+             '• Mantenha a pessoa consciente\n'
+             '• Não mova se houver suspeita de fratura\n'
+             '• Se parou de respirar: inicie RCP\n\n'
+             'Toque em "Ligar SAMU" abaixo para chamar agora.';
+    }
+
+    // ── PRIMEIROS SOCORROS ──
+    if (lower.contains('queimad')) {
+      return '🔥 Para queimaduras:\n\n'
+             '1. Resfrie com água corrente fria por 10-20 min\n'
+             '2. Nunca use gelo, manteiga ou pasta de dente\n'
+             '3. Cubra com pano limpo e úmido\n'
+             '4. Não estoure bolhas\n\n'
+             'Queimaduras extensas ou na face: ligue 192 (SAMU).\n\n'
+             '⚕️ Este assistente é informativo. Busque atendimento médico.';
+    }
+
+    if (lower.contains('convulsão') || lower.contains('epilep')) {
+      return '⚡ Para convulsão/epilepsia:\n\n'
+             '1. Afaste objetos perigosos do redor\n'
+             '2. Coloque algo macio embaixo da cabeça\n'
+             '3. Vire a pessoa de lado\n'
+             '4. NUNCA coloque nada na boca\n'
+             '5. Cronometre a duração\n\n'
+             'Ligue 192 se durar mais de 5 minutos ou for a primeira vez.\n\n'
+             '⚕️ Consulte um neurologista após a crise.';
+    }
+
+    if (lower.contains('engasgou') || lower.contains('engasgament')) {
+      return '😮 Para engasgamento:\n\n'
+             '1. Pergunte: "Você está engasgado?"\n'
+             '2. Se não conseguir falar: aplique a Manobra de Heimlich\n'
+             '3. Posicione-se atrás da pessoa\n'
+             '4. Faça um punho entre o umbigo e o peito\n'
+             '5. Puxe com força para dentro e para cima\n'
+             '6. Repita até o objeto sair\n\n'
+             'Em bebês: 5 tapas nas costas + 5 pressões no tórax.\n\n'
+             '⚕️ Se perder a consciência: inicie RCP e ligue 192.';
+    }
+
+    if (lower.contains('avc') || lower.contains('derrame')) {
+      return '🧠 AVC — Use o método FAST:\n\n'
+             '👁 F — Face: peça para sorrir. Um lado caiu?\n'
+             '💪 A — Braços: levante os dois. Um caiu?\n'
+             '🗣 S — Fala: repita uma frase. Está estranha?\n'
+             '⏰ T — Tempo: SIM a qualquer um? LIGUE 192 AGORA!\n\n'
+             'AVC é emergência — cada minuto causa dano cerebral permanente.\n\n'
+             'Toque em "Ligar SAMU" abaixo imediatamente.';
+    }
+
+    if (lower.contains('picada') || lower.contains('cobra') ||
+        lower.contains('escorpião')) {
+      return '🐍 Para picadas de animais peçonhentos:\n\n'
+             '1. Mantenha a calma e imobilize o membro\n'
+             '2. NUNCA faça torniquete ou corte a picada\n'
+             '3. NUNCA suce o veneno\n'
+             '4. Remova relógios e anéis do membro\n'
+             '5. Vá IMEDIATAMENTE ao pronto-socorro\n\n'
+             'O soro só é eficaz nas primeiras horas!\n\n'
+             '⚕️ Ligue 192 (SAMU) em casos graves.';
+    }
+
+    if (lower.contains('intoxica') || lower.contains('veneno') ||
+        lower.contains('remédio demais') || lower.contains('overdose')) {
+      return '☠️ Para intoxicação/envenenamento:\n\n'
+             '1. NÃO provoque vômito\n'
+             '2. Guarde a embalagem do produto\n'
+             '3. Ligue: 0800 722 6001 (Centro de Intoxicações — 24h gratuito)\n'
+             '4. Vá ao pronto-socorro levando a embalagem\n\n'
+             'Toque em "Ligar SAMU" abaixo para emergências graves.';
+    }
+
+    // ── REMÉDIOS ──
     if (lower.contains('remédio') || lower.contains('tomar') ||
-        lower.contains('horário') || lower.contains('dose')) {
+        lower.contains('horário') || lower.contains('dose') ||
+        lower.contains('medicamento')) {
       if (context.contains('Nenhum remédio')) {
-        return 'Você ainda não tem remédios cadastrados. '
-               'Toque em "Ver meus remédios" abaixo para adicionar o primeiro! 💊';
+        return '💊 Você ainda não tem remédios cadastrados.\n\n'
+               'Toque em "Ver meus remédios" para adicionar seus medicamentos '
+               'e configurar os horários de uso.';
       }
       final lines = context.split('\n')
           .where((l) => l.startsWith('- ') && l.contains('horários'))
           .take(3).join('\n');
       return 'Seus remédios cadastrados:\n\n$lines\n\n'
-             '⚕️ Sempre confirme com seu médico ou farmacêutico.';
+             '⚕️ Sempre confirme dosagens com seu médico ou farmacêutico.';
     }
 
-    // Estoque / repor
+    // ── ESTOQUE ──
     if (lower.contains('estoque') || lower.contains('acabando') ||
         lower.contains('repor') || lower.contains('comprar')) {
       if (context.contains('ESTOQUE BAIXO')) {
-        return '⚠️ Atenção! Você tem remédios com estoque baixo.\n\n'
-               'Toque em "Buscar farmácias" para fazer um novo pedido rapidamente. '
-               'Não interrompa seu tratamento! 🏪';
+        return '⚠️ Você tem remédios com estoque baixo!\n\n'
+               'Toque em "Buscar farmácias" para fazer um pedido antes de acabar. '
+               'Não interrompa seu tratamento sem orientação médica. 🏪';
       }
-      return '✅ Seus estoques estão ok por enquanto. '
-             'Continuo monitorando conforme você registrar as doses.';
+      return '✅ Seus estoques estão em ordem por enquanto.\n\n'
+             'Monitoro conforme você registra as doses tomadas.';
     }
 
-    // Pedidos
+    // ── PEDIDOS ──
     if (lower.contains('pedido') || lower.contains('entrega') ||
-        lower.contains('status')) {
+        lower.contains('status') || lower.contains('encomenda')) {
       if (context.contains('Nenhum pedido')) {
-        return 'Você ainda não fez nenhum pedido pelo app. '
-               'Acesse "Farmácias", escolha uma e toque em "Fazer pedido". 📦';
+        return '📦 Você ainda não fez nenhum pedido pelo app.\n\n'
+               'Acesse "Farmácias", escolha uma, veja os produtos e toque em "Fazer pedido".';
       }
       final lines = context.split('\n')
           .where((l) => l.startsWith('- Pedido')).take(3).join('\n');
       return 'Seus pedidos recentes:\n\n$lines\n\n'
-             'Toque em "Ver meus pedidos" para ver todos os detalhes.';
+             'Toque em "Ver meus pedidos" para todos os detalhes.';
     }
 
-    // Farmácias
-    if (lower.contains('farmácia') || lower.contains('loja') ||
-        lower.contains('perto')) {
-      if (context.contains('Nenhuma farmácia')) {
-        return 'Ainda não há farmácias cadastradas e aprovadas na plataforma. '
-               'Em breve mais farmácias estarão disponíveis! 🏪';
+    // ── FARMÁCIAS ──
+    if (lower.contains('farmácia') || lower.contains('comprar remédio') ||
+        lower.contains('perto') || lower.contains('próxima')) {
+      if (context.contains('Nenhuma disponível')) {
+        return '🏪 Ainda não há farmácias cadastradas na plataforma.\n\n'
+               'Em breve mais farmácias estarão disponíveis!';
       }
       final lines = context.split('\n')
-          .where((l) => l.startsWith('- ') && l.contains('entrega'))
+          .where((l) => l.startsWith('- ') && (l.contains('entrega') || l.contains('retirada')))
           .take(3).join('\n');
-      return 'Farmácias disponíveis na plataforma:\n\n$lines\n\n'
+      return 'Farmácias disponíveis:\n\n$lines\n\n'
              'Toque em "Ver farmácias" para ver produtos e fazer pedidos.';
     }
 
-    // Receita
-    if (lower.contains('receita') || lower.contains('foto') ||
-        lower.contains('câmera')) {
+    // ── RECEITA ──
+    if (lower.contains('receita') || lower.contains('câmera') ||
+        lower.contains('fotografar') || lower.contains('foto')) {
       return '📄 Para ler uma receita médica:\n\n'
-             '1. Toque em "Ler receita" abaixo\n'
-             '2. Fotografe ou selecione a imagem da receita\n'
-             '3. O app identifica os medicamentos automaticamente\n'
-             '4. Confirme e busque nas farmácias!\n\n'
+             '1. Toque no ícone 📷 ao lado do campo de texto\n'
+             '2. Escolha câmera ou galeria\n'
+             '3. O app lê o texto automaticamente\n'
+             '4. Confirme os medicamentos identificados\n'
+             '5. Busque nas farmácias com um toque!\n\n'
              '⚕️ Sempre confirme os medicamentos com seu médico.';
     }
 
-    // Dicas de saúde
+    // ── DICAS DE SAÚDE ──
     if (lower.contains('dica') || lower.contains('saúde') ||
-        lower.contains('bem-estar')) {
+        lower.contains('bem-estar') || lower.contains('alimenta') ||
+        lower.contains('exerc') || lower.contains('sono')) {
       return '💡 Dica do dia:\n\n'
-             'Tome seus medicamentos sempre no mesmo horário — isso ajuda o '
-             'corpo a manter o nível correto do remédio no sangue.\n\n'
-             'Beba bastante água, durma bem e movimente-se diariamente. '
-             'Toque em "Ver dicas" para mais conteúdos de saúde!\n\n'
+             'Tome seus medicamentos sempre no mesmo horário — '
+             'isso mantém o nível correto no sangue.\n\n'
+             'Beba bastante água, durma bem e movimente-se diariamente.\n\n'
+             'Toque em "Ver dicas" para mais conteúdos sobre saúde e '
+             'orientações de primeiros socorros!\n\n'
              '⚕️ Este assistente é informativo e não substitui orientação médica.';
     }
 
-    // Saudação
-    if (lower.contains('olá') || lower.contains('oi') ||
-        lower.contains('bom') || lower.contains('boa')) {
-      return 'Olá! 😊 Estou aqui para te ajudar.\n\n'
-             'Posso te informar sobre seus remédios, horários, '
-             'status de pedidos, farmácias disponíveis e muito mais.\n\n'
-             'O que você quer saber hoje?';
+    // ── EMERGÊNCIAS (número específico) ──
+    if (lower.contains('samu') || lower.contains('192')) {
+      return '🚑 SAMU — Serviço de Atendimento Médico de Urgência\n\n'
+             'Número: 192\n'
+             'Disponível 24 horas, 7 dias por semana.\n'
+             'Gratuito de qualquer telefone.\n\n'
+             'Toque em "Ligar SAMU" abaixo para chamar agora.';
     }
 
+    if (lower.contains('bombeiro') || lower.contains('193')) {
+      return '🚒 Corpo de Bombeiros\n\n'
+             'Número: 193\n'
+             'Para incêndios, resgates e acidentes.\n'
+             'Disponível 24 horas, gratuito.';
+    }
+
+    if (lower.contains('cvv') || lower.contains('suicid') ||
+        lower.contains('188')) {
+      return '💙 CVV — Centro de Valorização da Vida\n\n'
+             'Número: 188\n'
+             'Apoio emocional e prevenção do suicídio.\n'
+             'Disponível 24 horas, gratuito e sigiloso.\n\n'
+             'Você não está sozinho. Ajuda está disponível.';
+    }
+
+    // ── SAUDAÇÃO ──
+    if (lower.contains('olá') || lower.contains('oi') ||
+        lower.contains('bom dia') || lower.contains('boa tarde') ||
+        lower.contains('boa noite')) {
+      return 'Olá! 😊 Estou aqui para te ajudar.\n\n'
+             'Posso te ajudar com:\n'
+             '💊 Remédios e horários\n'
+             '📦 Status de pedidos\n'
+             '🏪 Farmácias\n'
+             '📄 Leitura de receitas\n'
+             '🏥 Primeiros socorros\n'
+             '🚨 Números de emergência\n'
+             '💡 Dicas de saúde\n\n'
+             'O que você precisa?';
+    }
+
+    // ── RESPOSTA PADRÃO ──
     return 'Entendi! Posso te ajudar com:\n\n'
            '💊 Seus remédios e horários\n'
            '📦 Status dos seus pedidos\n'
            '🏪 Farmácias disponíveis\n'
            '📄 Leitura de receitas\n'
+           '🏥 Primeiros socorros\n'
+           '🚨 Emergências (SAMU, Bombeiros...)\n'
            '💡 Dicas de saúde\n\n'
-           'O que você precisa?';
+           'Pergunte algo específico para eu te ajudar melhor!';
   }
 }
 
