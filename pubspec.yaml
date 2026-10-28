@@ -28,6 +28,7 @@ dependencies:
   http: ^1.6.0
   google_mlkit_text_recognition: ^0.16.0
   flutter_tts: ^4.2.5
+  firebase_ai: ^5.1.0
 
 dev_dependencies:
   flutter_test:

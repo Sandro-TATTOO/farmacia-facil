@@ -1,14 +1,13 @@
-import 'dart:convert';
+import 'package:firebase_ai/firebase_ai.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_tts/flutter_tts.dart';
-import 'package:http/http.dart' as http;
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/chat_message_model.dart';
 import '../models/medication_model.dart';
 
-const _geminiKey = String.fromEnvironment('GEMINI_API_KEY', defaultValue: '');
+// Firebase AI Logic — sem chave de API necessária
 
 // ─── Ação navegável ───────────────────────────────────────────────────────────
 class AssistantAction {
@@ -395,11 +394,15 @@ class AssistantNotifier extends Notifier<AssistantState> {
     msg.contains('fratura') || msg.contains('osso quebrado') ||
     msg.contains('primeiros socorros');
 
-  // ── Chama Gemini ──────────────────────────────────────────────────────────
+  // ── Chama Gemini via Firebase AI Logic (sem chave de API) ─────────────────
   Future<String> _callGemini(String userMessage, String context) async {
-    if (_geminiKey.isEmpty) return _localResponse(userMessage, context);
+    try {
+      // Firebase AI Logic usa autenticação Firebase — sem chave AQ. ou AIza
+      final model = FirebaseAI.googleAI().generativeModel(
+        model: 'gemini-2.0-flash',
+      );
 
-    final systemPrompt = '''
+      final prompt = '''
 Você é o assistente virtual do aplicativo Farmácia Fácil — um assistente de saúde pessoal completo.
 
 SUAS CAPACIDADES:
@@ -423,34 +426,17 @@ REGRAS:
 6. Para dúvidas médicas: "Este assistente é informativo. Consulte seu médico."
 7. Use emojis com moderação
 8. Nunca invente dados que não estão no contexto
+
+Pergunta do usuário: $userMessage
 ''';
 
-    final url = Uri.parse(
-      'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent',
-    );
+      final response = await model.generateContent([Content.text(prompt)]);
+      return response.text ?? _localResponse(userMessage, context);
 
-    final response = await http.post(
-      url,
-      headers: {
-        'Content-Type':   'application/json',
-        'x-goog-api-key': _geminiKey,
-      },
-      body: jsonEncode({
-        'system_instruction': {'parts': [{'text': systemPrompt}]},
-        'contents': [
-          {'role': 'user', 'parts': [{'text': userMessage}]}
-        ],
-        'generationConfig': {'temperature': 0.7, 'maxOutputTokens': 600},
-      }),
-    ).timeout(const Duration(seconds: 20));
-
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      return data['candidates']?[0]?['content']?['parts']?[0]?['text']
-          as String? ?? _localResponse(userMessage, context);
+    } catch (e) {
+      _log('Erro Firebase AI: $e');
+      return _localResponse(userMessage, context);
     }
-
-    return _localResponse(userMessage, context);
   }
 
   // ── Fallback local completo e refinado ─────────────────────────────────────
