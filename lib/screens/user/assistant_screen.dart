@@ -17,19 +17,18 @@ class AssistantScreen extends ConsumerStatefulWidget {
 }
 
 class _AssistantScreenState extends ConsumerState<AssistantScreen> {
-  final _controller  = TextEditingController();
-  final _scrollCtrl  = ScrollController();
-  final _focusNode   = FocusNode();
-  final _picker      = ImagePicker();
-  bool  _scanningPrescription = false;
+  final _controller = TextEditingController();
+  final _scrollCtrl = ScrollController();
+  final _focusNode  = FocusNode();
+  final _picker     = ImagePicker();
+  bool  _scanning   = false;
 
-  // Sugestões rápidas de perguntas
   static const _suggestions = [
     'Quais remédios devo tomar hoje?',
     'Algum remédio está acabando?',
-    'Como funciona a leitura de receita?',
     'O que fazer em caso de queimadura?',
     'Qual o número do SAMU?',
+    'Status dos meus pedidos',
     'Me dê uma dica de saúde',
   ];
 
@@ -63,34 +62,45 @@ class _AssistantScreenState extends ConsumerState<AssistantScreen> {
     });
   }
 
-  // Abre câmera/galeria, lê a receita e envia para o assistente
-  Future<void> _scanPrescription(ImageSource source) async {
-    if (kIsWeb) {
-      ref.read(assistantProvider.notifier).sendMessage(
-        'Como funciona a leitura de receita no app?',
-      );
-      return;
-    }
+  // Limpa toda a conversa
+  void _clearChat() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Limpar conversa'),
+        content: const Text('Deseja apagar todas as mensagens?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              ref.read(assistantProvider.notifier).clearChat();
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Limpar', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
 
+  // Câmera — só disponível no Android/iOS
+  Future<void> _scanPrescription(ImageSource source) async {
     try {
       final picked = await _picker.pickImage(
-        source:       source,
-        maxWidth:     1200,
-        imageQuality: 90,
+        source: source, maxWidth: 1200, imageQuality: 90,
       );
       if (picked == null) return;
 
-      setState(() => _scanningPrescription = true);
+      setState(() => _scanning = true);
+      ref.read(assistantProvider.notifier).sendImageMessage('📷 Analisando receita...');
 
-      // Envia mensagem de contexto para o chat
-      ref.read(assistantProvider.notifier).sendImageMessage(
-        '📷 Analisando receita médica...',
-      );
-
-      // OCR com ML Kit
-      final inputImage  = InputImage.fromFilePath(picked.path);
-      final recognizer  = TextRecognizer(script: TextRecognitionScript.latin);
-      final recognized  = await recognizer.processImage(inputImage);
+      final recognizer = TextRecognizer(script: TextRecognitionScript.latin);
+      final recognized = await recognizer.processImage(
+          InputImage.fromFilePath(picked.path));
       await recognizer.close();
 
       final text = recognized.text.trim();
@@ -98,90 +108,69 @@ class _AssistantScreenState extends ConsumerState<AssistantScreen> {
       if (text.isEmpty) {
         ref.read(assistantProvider.notifier).sendMessage(
           'Fotografei uma receita mas o texto não ficou legível. '
-          'Pode tentar novamente com mais luz?',
+          'Tente com mais luz ou aproxime mais a câmera.',
         );
       } else {
-        // Envia o texto para o assistente analisar
         ref.read(assistantProvider.notifier).sendMessage(
-          'Acabei de fotografar uma receita médica. '
-          'Aqui está o texto lido:\n\n$text\n\n'
-          'Quais medicamentos você consegue identificar nessa receita? '
-          'Me ajude a confirmar e sugira onde comprar.',
+          'Fotografei uma receita médica. Texto lido:\n\n$text\n\n'
+          'Quais medicamentos você identifica? Sugira onde comprar.',
         );
       }
-
       _scrollToBottom();
-    } catch (e) {
+    } catch (_) {
       ref.read(assistantProvider.notifier).sendMessage(
-        'Tive um problema ao acessar a câmera. Tente novamente.',
+        'Não consegui acessar a câmera. Tente novamente.',
       );
     } finally {
-      setState(() => _scanningPrescription = false);
+      setState(() => _scanning = false);
     }
   }
 
-  void _showImageSourceDialog() {
+  void _showCameraDialog() {
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (ctx) => SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(20),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Container(
-                width: 40, height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade300,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
+              Container(width: 40, height: 4,
+                  decoration: BoxDecoration(
+                      color: Colors.grey.shade300,
+                      borderRadius: BorderRadius.circular(2))),
               const SizedBox(height: 20),
-              const Text(
-                'Ler receita médica',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
+              const Text('Ler receita médica',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
               const SizedBox(height: 6),
-              const Text(
-                'Escolha como enviar a receita',
-                style: TextStyle(color: AppTheme.textGrey),
-              ),
-              const SizedBox(height: 20),
+              const Text('Escolha como enviar a receita',
+                  style: TextStyle(color: AppTheme.textGrey)),
+              const SizedBox(height: 16),
               ListTile(
                 leading: Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: AppTheme.primaryGreen.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Icon(Icons.camera_alt,
-                      color: AppTheme.primaryGreen),
+                      color: AppTheme.primaryGreen.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(12)),
+                  child: const Icon(Icons.camera_alt, color: AppTheme.primaryGreen),
                 ),
                 title: const Text('Tirar foto agora'),
                 subtitle: const Text('Abre a câmera do celular'),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  _scanPrescription(ImageSource.camera);
-                },
+                onTap: () { Navigator.pop(ctx); _scanPrescription(ImageSource.camera); },
               ),
               ListTile(
                 leading: Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: Colors.blue.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
+                      color: Colors.blue.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(12)),
                   child: const Icon(Icons.photo_library, color: Colors.blue),
                 ),
                 title: const Text('Escolher da galeria'),
                 subtitle: const Text('Seleciona uma foto existente'),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  _scanPrescription(ImageSource.gallery);
-                },
+                onTap: () { Navigator.pop(ctx); _scanPrescription(ImageSource.gallery); },
               ),
               const SizedBox(height: 8),
             ],
@@ -194,23 +183,24 @@ class _AssistantScreenState extends ConsumerState<AssistantScreen> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(assistantProvider);
-
-    // Auto-scroll quando nova mensagem chega
     ref.listen(assistantProvider, (_, __) => _scrollToBottom());
 
     return Scaffold(
       appBar: AppBar(
+        // ── Botão voltar ──
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => context.go('/home'),
+        ),
         title: Row(
           children: [
             Container(
-              width: 36,
-              height: 36,
+              width: 34, height: 34,
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.2),
-                shape: BoxShape.circle,
-              ),
+                  color: Colors.white.withValues(alpha: 0.2),
+                  shape: BoxShape.circle),
               child: const Icon(Icons.smart_toy_outlined,
-                  color: Colors.white, size: 20),
+                  color: Colors.white, size: 18),
             ),
             const SizedBox(width: 10),
             const Column(
@@ -225,38 +215,38 @@ class _AssistantScreenState extends ConsumerState<AssistantScreen> {
           ],
         ),
         actions: [
-          // Botão de voz
+          // Voz
           if (!kIsWeb)
             IconButton(
-              onPressed: () =>
-                  ref.read(assistantProvider.notifier).toggleVoice(),
+              onPressed: () => ref.read(assistantProvider.notifier).toggleVoice(),
               icon: Icon(
                 state.voiceEnabled
                     ? Icons.volume_up_outlined
                     : Icons.volume_off_outlined,
                 color: Colors.white,
               ),
-              tooltip: state.voiceEnabled
-                  ? 'Desativar voz'
-                  : 'Ativar voz',
             ),
-          // Indicador de fala ativa
+          // Parar narração
           if (state.isSpeaking)
             IconButton(
-              onPressed: () =>
-                  ref.read(assistantProvider.notifier).stopSpeaking(),
+              onPressed: () => ref.read(assistantProvider.notifier).stopSpeaking(),
               icon: const Icon(Icons.stop_circle_outlined, color: Colors.white),
-              tooltip: 'Parar narração',
             ),
+          // ── Botão limpar conversa ──
+          IconButton(
+            onPressed: _clearChat,
+            icon: const Icon(Icons.delete_outline, color: Colors.white),
+            tooltip: 'Limpar conversa',
+          ),
         ],
       ),
+
       body: Column(
         children: [
           // Aviso médico
           Container(
             color: Colors.blue.shade50,
-            padding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
             child: const Row(
               children: [
                 Icon(Icons.info_outline, size: 14, color: Colors.blue),
@@ -264,9 +254,7 @@ class _AssistantScreenState extends ConsumerState<AssistantScreen> {
                 Expanded(
                   child: Text(
                     'Assistente informativo. Não substitui orientação médica.',
-                    style: TextStyle(
-                        fontSize: 11,
-                        color: Colors.blue,
+                    style: TextStyle(fontSize: 11, color: Colors.blue,
                         fontStyle: FontStyle.italic),
                   ),
                 ),
@@ -287,8 +275,10 @@ class _AssistantScreenState extends ConsumerState<AssistantScreen> {
                 if (state.messages.length == 1 && index == 1) {
                   return _SuggestionsWidget(
                     suggestions: _suggestions,
-                    onTap: (s) =>
-                        ref.read(assistantProvider.notifier).sendMessage(s),
+                    onTap: (s) {
+                      ref.read(assistantProvider.notifier).sendMessage(s);
+                      _scrollToBottom();
+                    },
                   );
                 }
                 // Botões de ação navegável
@@ -307,16 +297,98 @@ class _AssistantScreenState extends ConsumerState<AssistantScreen> {
 
           // Campo de digitação
           _InputBar(
-            controller: _controller,
-            focusNode: _focusNode,
-            isLoading: state.isLoading || _scanningPrescription,
-            onSend: _send,
-            onCamera: _showImageSourceDialog,
+            controller:  _controller,
+            focusNode:   _focusNode,
+            isLoading:   state.isLoading || _scanning,
+            showCamera:  !kIsWeb,
+            onSend:      _send,
+            onCamera:    _showCameraDialog,
           ),
         ],
       ),
     );
   }
+}
+
+// ─── Botões de ação navegável ─────────────────────────────────────────────────
+class _ActionsWidget extends StatelessWidget {
+  final List<AssistantAction> actions;
+  final void Function(String) onTap;
+  const _ActionsWidget({required this.actions, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.only(bottom: 12, left: 40),
+        child: Wrap(
+          spacing: 8, runSpacing: 8,
+          children: actions.map((a) {
+            final isEmergency = a.isCall &&
+                (a.phone == '192' || a.phone == '193');
+            return ElevatedButton.icon(
+              onPressed: () async {
+                if (a.isCall && a.phone != null) {
+                  final uri = Uri.parse(
+                      'tel:${a.phone!.replaceAll(RegExp(r'[\s\-]'), '')}');
+                  if (await canLaunchUrl(uri)) await launchUrl(uri);
+                } else {
+                  onTap(a.route);
+                }
+              },
+              icon: Text(a.icon, style: const TextStyle(fontSize: 14)),
+              label: Text(a.label, style: const TextStyle(fontSize: 12)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor:
+                    isEmergency ? Colors.red : AppTheme.primaryGreen,
+                foregroundColor: Colors.white,
+                minimumSize: Size.zero,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20)),
+              ),
+            );
+          }).toList(),
+        ),
+      );
+}
+
+// ─── Sugestões rápidas ────────────────────────────────────────────────────────
+class _SuggestionsWidget extends StatelessWidget {
+  final List<String>          suggestions;
+  final void Function(String) onTap;
+  const _SuggestionsWidget({required this.suggestions, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.only(bottom: 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Sugestões:',
+                style: TextStyle(color: AppTheme.textGrey,
+                    fontSize: 12, fontWeight: FontWeight.w500)),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8, runSpacing: 8,
+              children: suggestions.map((s) => GestureDetector(
+                onTap: () => onTap(s),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                        color: AppTheme.primaryGreen.withValues(alpha: 0.4)),
+                  ),
+                  child: Text(s,
+                      style: const TextStyle(
+                          color: AppTheme.primaryGreen, fontSize: 12)),
+                ),
+              )).toList(),
+            ),
+          ],
+        ),
+      );
 }
 
 // ─── Bolha de mensagem ────────────────────────────────────────────────────────
@@ -327,7 +399,6 @@ class _MessageBubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isUser = message.isUser;
-
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Row(
@@ -335,7 +406,6 @@ class _MessageBubble extends StatelessWidget {
             isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          // Avatar do assistente
           if (!isUser) ...[
             CircleAvatar(
               radius: 16,
@@ -345,19 +415,14 @@ class _MessageBubble extends StatelessWidget {
             ),
             const SizedBox(width: 8),
           ],
-
-          // Bolha
           Flexible(
             child: Container(
               padding: const EdgeInsets.symmetric(
                   horizontal: 14, vertical: 10),
               constraints: BoxConstraints(
-                maxWidth: MediaQuery.of(context).size.width * 0.75,
-              ),
+                  maxWidth: MediaQuery.of(context).size.width * 0.75),
               decoration: BoxDecoration(
-                color: isUser
-                    ? AppTheme.primaryGreen
-                    : Colors.white,
+                color: isUser ? AppTheme.primaryGreen : Colors.white,
                 borderRadius: BorderRadius.only(
                   topLeft:     const Radius.circular(18),
                   topRight:    const Radius.circular(18),
@@ -377,16 +442,13 @@ class _MessageBubble extends StatelessWidget {
                   : Text(
                       message.text,
                       style: TextStyle(
-                        color:
-                            isUser ? Colors.white : AppTheme.textDark,
+                        color: isUser ? Colors.white : AppTheme.textDark,
                         fontSize: 14,
                         height: 1.5,
                       ),
                     ),
             ),
           ),
-
-          // Avatar do usuário
           if (isUser) ...[
             const SizedBox(width: 8),
             CircleAvatar(
@@ -403,10 +465,9 @@ class _MessageBubble extends StatelessWidget {
   }
 }
 
-// ─── Animação de "digitando..." ───────────────────────────────────────────────
+// ─── Animação digitando ───────────────────────────────────────────────────────
 class _TypingIndicator extends StatefulWidget {
   const _TypingIndicator();
-
   @override
   State<_TypingIndicator> createState() => _TypingIndicatorState();
 }
@@ -414,7 +475,7 @@ class _TypingIndicator extends StatefulWidget {
 class _TypingIndicatorState extends State<_TypingIndicator>
     with SingleTickerProviderStateMixin {
   late AnimationController _ctrl;
-  late Animation<double> _anim;
+  late Animation<double>   _anim;
 
   @override
   void initState() {
@@ -426,10 +487,7 @@ class _TypingIndicatorState extends State<_TypingIndicator>
   }
 
   @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
+  void dispose() { _ctrl.dispose(); super.dispose(); }
 
   @override
   Widget build(BuildContext context) => FadeTransition(
@@ -447,121 +505,28 @@ class _TypingIndicatorState extends State<_TypingIndicator>
 
 class _Dot extends StatelessWidget {
   const _Dot();
-
   @override
   Widget build(BuildContext context) => Container(
-        width: 8,
-        height: 8,
+        width: 8, height: 8,
         decoration: const BoxDecoration(
-          color: AppTheme.textGrey,
-          shape: BoxShape.circle,
-        ),
-      );
-}
-
-// ─── Botões de ação navegável ────────────────────────────────────────────────
-class _ActionsWidget extends StatelessWidget {
-  final List<AssistantAction>  actions;
-  final void Function(String)  onTap;
-
-  const _ActionsWidget({required this.actions, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.only(bottom: 12, left: 40),
-        child: Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: actions.map((a) {
-            final isEmergency = a.isCall && (a.phone == '192' || a.phone == '193');
-            return ElevatedButton.icon(
-              onPressed: () async {
-                if (a.isCall && a.phone != null) {
-                  final uri = Uri.parse('tel:${a.phone!.replaceAll(RegExp(r'[\s\-]'), '')}');
-                  if (await canLaunchUrl(uri)) await launchUrl(uri);
-                } else {
-                  onTap(a.route);
-                }
-              },
-              icon: Text(a.icon, style: const TextStyle(fontSize: 14)),
-              label: Text(a.label, style: const TextStyle(fontSize: 12)),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: isEmergency ? Colors.red : AppTheme.primaryGreen,
-                foregroundColor: Colors.white,
-                minimumSize: Size.zero,
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(20)),
-              ),
-            );
-          }).toList(),
-        ),
-      );
-}
-
-// ─── Sugestões rápidas ────────────────────────────────────────────────────────
-class _SuggestionsWidget extends StatelessWidget {
-  final List<String> suggestions;
-  final void Function(String) onTap;
-
-  const _SuggestionsWidget(
-      {required this.suggestions, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.only(bottom: 16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Sugestões:',
-                style: TextStyle(
-                    color: AppTheme.textGrey,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500)),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: suggestions
-                  .map((s) => GestureDetector(
-                        onTap: () => onTap(s),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 8),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(
-                                color: AppTheme.primaryGreen
-                                    .withValues(alpha: 0.4)),
-                          ),
-                          child: Text(
-                            s,
-                            style: const TextStyle(
-                                color: AppTheme.primaryGreen,
-                                fontSize: 12),
-                          ),
-                        ),
-                      ))
-                  .toList(),
-            ),
-          ],
-        ),
+            color: AppTheme.textGrey, shape: BoxShape.circle),
       );
 }
 
 // ─── Barra de input ───────────────────────────────────────────────────────────
 class _InputBar extends StatelessWidget {
   final TextEditingController controller;
-  final FocusNode            focusNode;
-  final bool                 isLoading;
-  final VoidCallback         onSend;
-  final VoidCallback         onCamera;
+  final FocusNode             focusNode;
+  final bool                  isLoading;
+  final bool                  showCamera;
+  final VoidCallback          onSend;
+  final VoidCallback          onCamera;
 
   const _InputBar({
     required this.controller,
     required this.focusNode,
     required this.isLoading,
+    required this.showCamera,
     required this.onSend,
     required this.onCamera,
   });
@@ -569,9 +534,7 @@ class _InputBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
         padding: EdgeInsets.only(
-          left: 8,
-          right: 8,
-          top: 8,
+          left: 8, right: 8, top: 8,
           bottom: 8 + MediaQuery.of(context).viewInsets.bottom,
         ),
         decoration: BoxDecoration(
@@ -586,8 +549,8 @@ class _InputBar extends StatelessWidget {
         ),
         child: Row(
           children: [
-            // Botão câmera
-            if (!kIsWeb)
+            // ── Botão câmera (só Android/iOS) ──
+            if (showCamera)
               IconButton(
                 onPressed: isLoading ? null : onCamera,
                 icon: const Icon(Icons.camera_alt_outlined),
@@ -602,9 +565,11 @@ class _InputBar extends StatelessWidget {
                 maxLines:   null,
                 textCapitalization: TextCapitalization.sentences,
                 decoration: InputDecoration(
-                  hintText:    'Digite ou use a câmera...',
-                  filled:      true,
-                  fillColor:   Colors.grey.shade100,
+                  hintText:  showCamera
+                      ? 'Digite ou fotografe uma receita...'
+                      : 'Digite sua pergunta...',
+                  filled:     true,
+                  fillColor:  Colors.grey.shade100,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(24),
                     borderSide: BorderSide.none,
@@ -628,21 +593,20 @@ class _InputBar extends StatelessWidget {
                       child: SizedBox(
                         width: 20, height: 20,
                         child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: AppTheme.primaryGreen,
-                        ),
+                          strokeWidth: 2, color: AppTheme.primaryGreen),
                       ),
                     ),
                   )
                 : Material(
-                    color:        AppTheme.primaryGreen,
-                    shape:        const CircleBorder(),
+                    color:       AppTheme.primaryGreen,
+                    shape:       const CircleBorder(),
                     child: InkWell(
-                      onTap:        onSend,
+                      onTap:       onSend,
                       customBorder: const CircleBorder(),
                       child: const Padding(
                         padding: EdgeInsets.all(10),
-                        child: Icon(Icons.send, color: Colors.white, size: 22),
+                        child: Icon(Icons.send,
+                            color: Colors.white, size: 22),
                       ),
                     ),
                   ),

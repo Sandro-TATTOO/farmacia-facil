@@ -114,6 +114,22 @@ class AssistantNotifier extends Notifier<AssistantState> {
     }
   }
 
+  // ── Limpa toda a conversa ─────────────────────────────────────────────────
+  void clearChat() {
+    stopSpeaking();
+    state = AssistantState(
+      voiceEnabled: state.voiceEnabled,
+      messages: [
+        ChatMessage(
+          id:        'welcome_new',
+          text:      'Conversa reiniciada! 👋\n\nComo posso te ajudar?',
+          role:      MessageRole.assistant,
+          createdAt: DateTime.now(),
+        ),
+      ],
+    );
+  }
+
   // ── Mensagem de sistema (câmera, etc.) ─────────────────────────────────────
   void sendImageMessage(String text) {
     final msg = ChatMessage(
