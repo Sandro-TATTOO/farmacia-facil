@@ -394,6 +394,10 @@ class AssistantNotifier extends Notifier<AssistantState> {
     msg.contains('fratura') || msg.contains('osso quebrado') ||
     msg.contains('primeiros socorros');
 
+  void _log(String msg) {
+    if (kDebugMode) debugPrint('[Assistant] $msg');
+  }
+
   // ── Chama Gemini via Firebase AI Logic (sem chave de API) ─────────────────
   Future<String> _callGemini(String userMessage, String context) async {
     try {
